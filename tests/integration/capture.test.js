@@ -37,12 +37,12 @@ describe('captureImpl', () => {
     expect(result.created_note_id).not.toContain('/');
   });
 
-  it('folder field in manifest is derived from type', async () => {
+  it('folder field in noteCache is derived from type', async () => {
     const result = await captureImpl(
       { content: 'Body', suggested_type: 'task', title: 'Task Note' },
       ctx
     );
-    const entry = ctx.manifest[result.created_note_id];
+    const entry = ctx.noteCache[result.created_note_id];
     expect(entry).toBeDefined();
     expect(entry.folder).toBe('tasks');
   });
@@ -61,13 +61,13 @@ describe('captureImpl', () => {
     expect(data.created).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
   });
 
-  it('manifest is updated after capture', async () => {
+  it('noteCache is updated after capture', async () => {
     const result = await captureImpl(
       { content: 'Body', suggested_type: 'note', title: 'Manifest Test Note' },
       ctx
     );
-    expect(ctx.manifest[result.created_note_id]).toBeDefined();
-    expect(ctx.manifest[result.created_note_id].title).toBe('Manifest Test Note');
+    expect(ctx.noteCache[result.created_note_id]).toBeDefined();
+    expect(ctx.noteCache[result.created_note_id].title).toBe('Manifest Test Note');
   });
 
   it('returns created_note_id and suggested_links', async () => {
@@ -126,8 +126,8 @@ describe('captureImpl', () => {
     );
     // ID has no folder prefix
     expect(result.created_note_id).toMatch(/^\d{14}$/);
-    // folder in manifest should still be 'notes' (from type=note)
-    const entry = ctx.manifest[result.created_note_id];
+    // folder in noteCache should still be 'notes' (from type=note)
+    const entry = ctx.noteCache[result.created_note_id];
     expect(entry.folder).toBe('notes');
   });
 
@@ -141,19 +141,19 @@ describe('captureImpl', () => {
     expect(data.title).toBe('My Heading Title');
   });
 
-  it('project type has folder=projects in manifest', async () => {
+  it('project type has folder=projects in noteCache', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'project', title: 'New Project' },
       ctx
     );
-    expect(ctx.manifest[result.created_note_id].folder).toBe('projects');
+    expect(ctx.noteCache[result.created_note_id].folder).toBe('projects');
   });
 
-  it('meeting type has folder=meetings in manifest', async () => {
+  it('meeting type has folder=meetings in noteCache', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'meeting', title: 'New Meeting' },
       ctx
     );
-    expect(ctx.manifest[result.created_note_id].folder).toBe('meetings');
+    expect(ctx.noteCache[result.created_note_id].folder).toBe('meetings');
   });
 });

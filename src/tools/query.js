@@ -2,12 +2,12 @@
 
 /**
  * Query the PKM vault.
- * Combines manifest-based where filters, FTS search, link-based filtering,
+ * Combines noteCache-based where filters, FTS search, link-based filtering,
  * and optional traversal via `include`.
  */
 
 /**
- * Evaluate a single where clause value against a manifest entry value.
+ * Evaluate a single where clause value against a noteCache entry value.
  * Supports: equality, today sentinel, date range, in, not_in, ne,
  * contains, not_contains, starts_with, ends_with.
  */
@@ -44,8 +44,8 @@ function matchesFilter(entryVal, val) {
 }
 
 /**
- * Filter an array of manifest entries by a where clause object.
- * Throws if a key isn't present anywhere in the manifest universe.
+ * Filter an array of noteCache entries by a where clause object.
+ * Throws if a key isn't present anywhere in the noteCache universe.
  */
 function applyWhere(candidates, where) {
   const allKeys = new Set(candidates.flatMap(e => Object.keys(e)));
@@ -59,18 +59,22 @@ function applyWhere(candidates, where) {
 
 /**
  * Resolve a single `include` spec for one root entry.
- * Returns an array of manifest entries matching the spec.
+ * Returns an array of noteCache entries matching the spec.
  */
-function resolveIncludeSpec(rootEntry, spec, ctx) {
-  const { db, manifest } = ctx;
+function resolveIncludeSpec(rootEntry, spec, ctx, includeSuperseded) {
+  const { db, noteCache } = ctx;
 
   // Get candidate slugs via note_links
   const direction = spec.linked ? (spec.linked.direction || 'any') : 'any';
   const linkedSlugs = db.getLinked(rootEntry.id, direction);
 
   let candidates = [...linkedSlugs]
-    .map(slug => manifest[slug])
-    .filter(Boolean); // exclude superseded (not in manifest) and missing
+    .map(slug => noteCache[slug])
+    .filter(Boolean);
+
+  if (!includeSuperseded) {
+    candidates = candidates.filter(e => !e.superseded_by);
+  }
 
   if (spec.where) {
     // Don't throw on unknown keys here — included notes may have different field sets
@@ -83,17 +87,20 @@ function resolveIncludeSpec(rootEntry, spec, ctx) {
 }
 
 /**
- * Run a query against the manifest (and FTS/link indexes).
+ * Run a query against the noteCache (and FTS/link indexes).
  * @param {object} args - { where, search, linked, include, result_format, sort, limit }
- * @param {object} ctx  - { db, manifest, vaultPath }
+ * @param {object} ctx  - { db, noteCache, vaultPath }
  * @returns {Array|{count: number}}
  */
 async function queryImpl(args, ctx) {
-  const { where, search, linked, include, result_format, sort, limit } = args;
-  const { db, manifest } = ctx;
+  const { where, search, linked, include, result_format, sort, limit, include_superseded = false } = args;
+  const { db, noteCache } = ctx;
 
-  // Step 1: where filter on manifest
-  let candidates = Object.values(manifest);
+  // Step 1: start from noteCache; exclude superseded by default
+  let candidates = Object.values(noteCache);
+  if (!include_superseded) {
+    candidates = candidates.filter(e => !e.superseded_by);
+  }
   if (where) {
     candidates = applyWhere(candidates, where);
   }
@@ -159,7 +166,7 @@ async function queryImpl(args, ctx) {
     results = results.map(entry => {
       const _included = {};
       for (const [key, spec] of Object.entries(include)) {
-        _included[key] = resolveIncludeSpec(entry, spec, ctx);
+        _included[key] = resolveIncludeSpec(entry, spec, ctx, include_superseded);
       }
       return { ...entry, _included };
     });
@@ -199,13 +206,17 @@ function register(mcpServer, ctx) {
           'Example: { open_tasks: { linked: { direction: "from" }, where: { type: "task", status: { ne: "done" } } } }',
       },
       result_format: {
-        description: '"manifest" (default), "full" (include body), "count", or array of field names',
+        description: '"default" (note cache fields), "full" (include body), "count", or array of field names',
       },
       sort: {
         type: 'object',
         description: '{ field: string, order: "asc"|"desc" }',
       },
       limit: { type: 'number', description: 'Max results (default 25)' },
+      include_superseded: {
+        type: 'boolean',
+        description: 'Include superseded notes in results (default false). Use when querying history or a specific superseded note.',
+      },
     },
     async (args) => {
       const result = await queryImpl(args, ctx);

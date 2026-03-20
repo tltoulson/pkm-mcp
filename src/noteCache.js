@@ -1,24 +1,24 @@
 'use strict';
 
 /**
- * In-memory manifest: flat dict keyed by slug.
- * Contains all non-superseded notes with frontmatter spread flat.
+ * In-memory note cache: flat dict keyed by id. Contains ALL notes including
+ * superseded ones. Superseded notes have superseded_by set — query filters
+ * them out by default unless include_superseded: true is passed.
  * This is the primary query surface — SQLite is NOT queried for metadata.
  */
 
 /**
- * Build the manifest from all notes in the database.
- * Excludes notes where superseded_by is set.
+ * Build the note cache from all notes in the database.
+ * Includes superseded notes — exclusion is query-layer responsibility.
  * Parses metadata JSON and spreads fields flat onto each entry.
  * @param {object} db - db object from initDb
- * @returns {object} manifest keyed by slug
+ * @returns {object} noteCache keyed by id
  */
-function initManifest(db) {
-  const manifest = {};
+function initNoteCache(db) {
+  const noteCache = {};
   const rows = db.getAllNotes();
 
   for (const row of rows) {
-    if (row.superseded_by) continue; // Constraint #8: superseded notes excluded
 
     let parsedMetadata = {};
     if (row.metadata) {
@@ -29,10 +29,10 @@ function initManifest(db) {
       }
     }
 
-    // Remove internal _body key from manifest entries (it's for FTS only)
+    // Remove internal _body key from noteCache entries (it's for FTS only)
     const { _body, ...metaWithoutBody } = parsedMetadata;
 
-    manifest[row.id] = {
+    noteCache[row.id] = {
       id: row.id,
       type: row.type,
       title: row.title,
@@ -45,23 +45,17 @@ function initManifest(db) {
     };
   }
 
-  return manifest;
+  return noteCache;
 }
 
 /**
- * Add or update a manifest entry.
- * If the note has superseded_by set, removes it from manifest instead.
- * @param {object} manifest
+ * Add or update a noteCache entry.
+ * All notes are stored — superseded_by field is preserved for query filtering.
+ * @param {object} noteCache
  * @param {string} slug
  * @param {object} noteRow - has same shape as notes table row (with metadata as JSON string or object)
  */
-function addToManifest(manifest, slug, noteRow) {
-  // If superseded, remove from manifest
-  if (noteRow.superseded_by) {
-    removeFromManifest(manifest, slug);
-    return;
-  }
-
+function addToCache(noteCache, slug, noteRow) {
   let parsedMetadata = {};
   if (noteRow.metadata) {
     if (typeof noteRow.metadata === 'string') {
@@ -78,7 +72,7 @@ function addToManifest(manifest, slug, noteRow) {
   // Remove internal _body key
   const { _body, ...metaWithoutBody } = parsedMetadata;
 
-  manifest[slug] = {
+  noteCache[slug] = {
     id: slug,
     type: noteRow.type || 'note',
     title: noteRow.title || slug,
@@ -92,12 +86,12 @@ function addToManifest(manifest, slug, noteRow) {
 }
 
 /**
- * Remove an entry from the manifest.
- * @param {object} manifest
+ * Remove an entry from the note cache.
+ * @param {object} noteCache
  * @param {string} slug
  */
-function removeFromManifest(manifest, slug) {
-  delete manifest[slug];
+function removeFromCache(noteCache, slug) {
+  delete noteCache[slug];
 }
 
-module.exports = { initManifest, addToManifest, removeFromManifest };
+module.exports = { initNoteCache, addToCache, removeFromCache };

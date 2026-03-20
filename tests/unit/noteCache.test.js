@@ -5,12 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { initDb } = require('../../src/db');
-const { initManifest, addToManifest, removeFromManifest } = require('../../src/manifest');
+const { initNoteCache, addToCache, removeFromCache } = require('../../src/noteCache');
 
 let tmpDir, db;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-manifest-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-notecache-'));
   db = initDb(tmpDir);
 });
 
@@ -33,42 +33,43 @@ function insertNote(id, fields = {}) {
   db.upsertNote(id, { type, title, folder, created, modified, superseded_by, supersedes, metadata });
 }
 
-describe('initManifest', () => {
-  it('loads non-superseded notes into manifest', () => {
+describe('initNoteCache', () => {
+  it('loads non-superseded notes into noteCache', () => {
     insertNote('20260101000000', { title: 'Note A', folder: 'notes' });
     insertNote('20260101000001', { title: 'Note B', folder: 'notes' });
-    const manifest = initManifest(db);
-    expect(manifest['20260101000000']).toBeDefined();
-    expect(manifest['20260101000001']).toBeDefined();
+    const noteCache = initNoteCache(db);
+    expect(noteCache['20260101000000']).toBeDefined();
+    expect(noteCache['20260101000001']).toBeDefined();
   });
 
-  it('excludes superseded notes from manifest', () => {
+  it('includes superseded notes in noteCache with superseded_by set', () => {
     insertNote('20260101000000', { title: 'Current', folder: 'notes' });
     insertNote('20260101000001', {
       title: 'Old Note',
       folder: 'notes',
       superseded_by: '20260101000000',
     });
-    const manifest = initManifest(db);
-    expect(manifest['20260101000000']).toBeDefined();
-    expect(manifest['20260101000001']).toBeUndefined();
+    const noteCache = initNoteCache(db);
+    expect(noteCache['20260101000000']).toBeDefined();
+    expect(noteCache['20260101000001']).toBeDefined();
+    expect(noteCache['20260101000001'].superseded_by).toBe('20260101000000');
   });
 
-  it('spreads metadata fields flat onto manifest entry', () => {
+  it('spreads metadata fields flat onto noteCache entry', () => {
     insertNote('20260301000000', {
       type: 'task',
       title: 'My Task',
       folder: 'tasks',
       metadata: { gtd: 'next', status: 'todo', due: '2026-03-30' },
     });
-    const manifest = initManifest(db);
-    const entry = manifest['20260301000000'];
+    const noteCache = initNoteCache(db);
+    const entry = noteCache['20260301000000'];
     expect(entry.gtd).toBe('next');
     expect(entry.status).toBe('todo');
     expect(entry.due).toBe('2026-03-30');
   });
 
-  it('manifest entries have expected shape', () => {
+  it('noteCache entries have expected shape', () => {
     insertNote('20260101000002', {
       type: 'note',
       title: 'Shaped Note',
@@ -76,8 +77,8 @@ describe('initManifest', () => {
       created: '2026-01-01T09:00:00',
       modified: '2026-01-02T09:00:00',
     });
-    const manifest = initManifest(db);
-    const entry = manifest['20260101000002'];
+    const noteCache = initNoteCache(db);
+    const entry = noteCache['20260101000002'];
     expect(entry.id).toBe('20260101000002');
     expect(entry.type).toBe('note');
     expect(entry.title).toBe('Shaped Note');
@@ -88,22 +89,22 @@ describe('initManifest', () => {
     expect(entry.supersedes).toBeNull();
   });
 
-  it('does not include _body in manifest entries', () => {
+  it('does not include _body in noteCache entries', () => {
     insertNote('20260101000003', {
       folder: 'notes',
       metadata: { _body: 'some body content', subtype: 'research' },
     });
-    const manifest = initManifest(db);
-    const entry = manifest['20260101000003'];
+    const noteCache = initNoteCache(db);
+    const entry = noteCache['20260101000003'];
     expect(entry._body).toBeUndefined();
     expect(entry.subtype).toBe('research');
   });
 });
 
-describe('addToManifest', () => {
-  it('adds a new entry to manifest', () => {
-    const manifest = {};
-    addToManifest(manifest, '20260301000001', {
+describe('addToCache', () => {
+  it('adds a new entry to noteCache', () => {
+    const noteCache = {};
+    addToCache(noteCache, '20260301000001', {
       type: 'task',
       title: 'New Task',
       folder: 'tasks',
@@ -113,13 +114,13 @@ describe('addToManifest', () => {
       supersedes: null,
       metadata: { gtd: 'inbox' },
     });
-    expect(manifest['20260301000001']).toBeDefined();
-    expect(manifest['20260301000001'].gtd).toBe('inbox');
+    expect(noteCache['20260301000001']).toBeDefined();
+    expect(noteCache['20260301000001'].gtd).toBe('inbox');
   });
 
   it('updates an existing entry', () => {
-    const manifest = { '20260301000002': { id: '20260301000002', title: 'Old' } };
-    addToManifest(manifest, '20260301000002', {
+    const noteCache = { '20260301000002': { id: '20260301000002', title: 'Old' } };
+    addToCache(noteCache, '20260301000002', {
       type: 'task',
       title: 'New Title',
       folder: 'tasks',
@@ -127,12 +128,12 @@ describe('addToManifest', () => {
       supersedes: null,
       metadata: {},
     });
-    expect(manifest['20260301000002'].title).toBe('New Title');
+    expect(noteCache['20260301000002'].title).toBe('New Title');
   });
 
-  it('removes from manifest when superseded_by is set', () => {
-    const manifest = { '20260101000004': { id: '20260101000004', title: 'Old Note' } };
-    addToManifest(manifest, '20260101000004', {
+  it('keeps superseded note in noteCache with superseded_by set', () => {
+    const noteCache = { '20260101000004': { id: '20260101000004', title: 'Old Note' } };
+    addToCache(noteCache, '20260101000004', {
       type: 'note',
       title: 'Old Note',
       folder: 'notes',
@@ -140,20 +141,21 @@ describe('addToManifest', () => {
       supersedes: null,
       metadata: {},
     });
-    expect(manifest['20260101000004']).toBeUndefined();
+    expect(noteCache['20260101000004']).toBeDefined();
+    expect(noteCache['20260101000004'].superseded_by).toBe('20260101000005');
   });
 });
 
-describe('removeFromManifest', () => {
+describe('removeFromCache', () => {
   it('removes an existing entry', () => {
-    const manifest = { '20260301000003': { id: '20260301000003' } };
-    removeFromManifest(manifest, '20260301000003');
-    expect(manifest['20260301000003']).toBeUndefined();
+    const noteCache = { '20260301000003': { id: '20260301000003' } };
+    removeFromCache(noteCache, '20260301000003');
+    expect(noteCache['20260301000003']).toBeUndefined();
   });
 
   it('is a no-op for non-existent id', () => {
-    const manifest = { '20260301000004': { id: '20260301000004' } };
-    removeFromManifest(manifest, '99999999999999');
-    expect(manifest['20260301000004']).toBeDefined();
+    const noteCache = { '20260301000004': { id: '20260301000004' } };
+    removeFromCache(noteCache, '99999999999999');
+    expect(noteCache['20260301000004']).toBeDefined();
   });
 });

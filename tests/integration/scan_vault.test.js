@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 const { createTestContext, cleanupTestContext, FIXTURE_VAULT } = require('../helpers/setup');
 const { initDb } = require('../../src/db');
-const { initManifest } = require('../../src/manifest');
+const { initNoteCache } = require('../../src/noteCache');
 
 let ctx;
 
@@ -78,9 +78,11 @@ describe('scanVault', () => {
     expect(row.superseded_by).toBeTruthy();
   });
 
-  it('superseded notes NOT in manifest', () => {
-    expect(ctx.manifest['20251115000000']).toBeUndefined();
-    expect(ctx.manifest['20251201000000']).toBeUndefined();
+  it('superseded notes ARE in noteCache with superseded_by set', () => {
+    expect(ctx.noteCache['20251115000000']).toBeDefined();
+    expect(ctx.noteCache['20251115000000'].superseded_by).toBeTruthy();
+    expect(ctx.noteCache['20251201000000']).toBeDefined();
+    expect(ctx.noteCache['20251201000000'].superseded_by).toBeTruthy();
   });
 
   it('schema version mismatch triggers rebuild', () => {

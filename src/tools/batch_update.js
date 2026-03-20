@@ -6,7 +6,7 @@ const { updateImpl } = require('./update');
  * Batch update multiple notes in one call.
  * Individual failures do NOT abort remaining operations.
  * @param {object} args - { operations: [{id, title, metadata, content}] }
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ results: Array }}
  */
 async function batchUpdateImpl(args, ctx) {

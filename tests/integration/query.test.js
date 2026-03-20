@@ -356,13 +356,29 @@ describe('queryImpl — combined filters', () => {
 // superseded notes excluded
 // ---------------------------------------------------------------------------
 
-describe('queryImpl — superseded notes excluded', () => {
-  it('superseded notes do not appear in results', async () => {
+describe('queryImpl — superseded notes', () => {
+  it('superseded notes do not appear in results by default', async () => {
     const results = await queryImpl({}, ctx);
     const ids = results.map(r => r.id);
     // 20251115000000 = old-api-versioning (superseded)
     expect(ids).not.toContain('20251115000000');
     // 20251201000000 = old-api-principles (superseded)
     expect(ids).not.toContain('20251201000000');
+  });
+
+  it('include_superseded: true returns superseded notes', async () => {
+    const results = await queryImpl({ include_superseded: true, limit: 200 }, ctx);
+    const ids = results.map(r => r.id);
+    expect(ids).toContain('20251115000000');
+    expect(ids).toContain('20251201000000');
+  });
+
+  it('include_superseded: true with where: {id} finds a superseded note directly', async () => {
+    const results = await queryImpl({
+      where: { id: '20251115000000' },
+      include_superseded: true,
+    }, ctx);
+    expect(results).toHaveLength(1);
+    expect(results[0].superseded_by).toBeTruthy();
   });
 });

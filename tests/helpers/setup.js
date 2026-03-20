@@ -4,13 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { initDb } = require('../../src/db');
-const { initManifest } = require('../../src/manifest');
+const { initNoteCache } = require('../../src/noteCache');
 
 const FIXTURE_VAULT = path.join(__dirname, '../fixtures/vault');
 
 /**
  * Create a fresh test context with a copy of the fixture vault in a temp dir.
- * Returns { db, manifest, vaultPath, indexPath, tempDir }.
+ * Returns { db, noteCache, vaultPath, indexPath, tempDir }.
  */
 function createTestContext() {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-test-'));
@@ -23,9 +23,9 @@ function createTestContext() {
 
   const db = initDb(indexPath);
   db.scanVault(vaultPath);
-  const manifest = initManifest(db);
+  const noteCache = initNoteCache(db);
 
-  return { db, manifest, vaultPath, indexPath, tempDir };
+  return { db, noteCache, vaultPath, indexPath, tempDir };
 }
 
 /**

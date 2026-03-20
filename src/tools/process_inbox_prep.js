@@ -7,13 +7,13 @@
 
 /**
  * @param {object} args - (unused)
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {Array}
  */
 async function processInboxPrepImpl(args, ctx) {
-  const { db, manifest } = ctx;
+  const { db, noteCache } = ctx;
 
-  const inboxTasks = Object.values(manifest).filter(e =>
+  const inboxTasks = Object.values(noteCache).filter(e =>
     e.type === 'task' && e.gtd === 'inbox'
   );
 

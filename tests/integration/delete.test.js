@@ -29,10 +29,10 @@ describe('deleteImpl', () => {
     expect(fs.existsSync(filepath)).toBe(false);
   });
 
-  it('removes note from manifest after delete', async () => {
-    expect(ctx.manifest[DELETE_ID]).toBeDefined();
+  it('removes note from noteCache after delete', async () => {
+    expect(ctx.noteCache[DELETE_ID]).toBeDefined();
     await deleteImpl({ id: DELETE_ID, confirm_id: DELETE_ID }, ctx);
-    expect(ctx.manifest[DELETE_ID]).toBeUndefined();
+    expect(ctx.noteCache[DELETE_ID]).toBeUndefined();
   });
 
   it('removes note from db after delete', async () => {

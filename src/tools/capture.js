@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { generateId, idToPath, NOTES_DIR } = require('../utils/timestamp');
 const { extractLinks } = require('../utils/links');
-const { addToManifest } = require('../manifest');
+const { addToCache } = require('../noteCache');
 const { nowTimestamp, writeNote } = require('../utils/frontmatter');
 
 /**
@@ -25,7 +25,7 @@ const TYPE_TO_FOLDER = {
 /**
  * Capture a new note in the vault.
  * @param {object} args
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ created_note_id: string, suggested_links: Array }}
  */
 async function captureImpl(args, ctx) {
@@ -37,7 +37,7 @@ async function captureImpl(args, ctx) {
     related_note_ids = [],
     suggested_folder,  // accepted but ignored — folder is derived from type
   } = args;
-  const { db, manifest, vaultPath } = ctx;
+  const { db, noteCache, vaultPath } = ctx;
 
   // Determine logical folder (from type, not path)
   const folder = TYPE_TO_FOLDER[suggested_type] || 'notes';
@@ -100,8 +100,8 @@ async function captureImpl(args, ctx) {
   const links = extractLinks(id, frontmatterData, content);
   db.upsertNoteLinks(id, links);
 
-  // Update manifest
-  addToManifest(manifest, id, {
+  // Update noteCache
+  addToCache(noteCache, id, {
     type: suggested_type,
     title,
     folder,
@@ -114,8 +114,8 @@ async function captureImpl(args, ctx) {
 
   // Build suggested_links from related_note_ids
   const suggested_links = (related_note_ids || [])
-    .filter(id => manifest[id])
-    .map(id => ({ id, title: manifest[id]?.title }));
+    .filter(id => noteCache[id])
+    .map(id => ({ id, title: noteCache[id]?.title }));
 
   return { created_note_id: id, suggested_links };
 }

@@ -44,8 +44,8 @@ function waitForWatcherReady(w) {
 }
 
 describe('watcher', () => {
-  it('detects new file and adds to manifest', async () => {
-    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
+  it('detects new file and adds to noteCache', async () => {
+    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.noteCache);
     await waitForWatcherReady(watcher);
 
     // Use a fixed timestamp ID for the new file
@@ -61,14 +61,14 @@ describe('watcher', () => {
       modified: '2026-03-19T10:00:00',
     }), 'utf8');
 
-    const found = await waitFor(() => ctx.manifest[id] !== undefined);
+    const found = await waitFor(() => ctx.noteCache[id] !== undefined);
     expect(found).toBe(true);
-    expect(ctx.manifest[id]).toBeDefined();
-    expect(ctx.manifest[id].title).toBe('Test watcher note');
+    expect(ctx.noteCache[id]).toBeDefined();
+    expect(ctx.noteCache[id].title).toBe('Test watcher note');
   });
 
-  it('detects modified file and updates manifest', async () => {
-    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
+  it('detects modified file and updates noteCache', async () => {
+    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.noteCache);
     await waitForWatcherReady(watcher);
 
     // Use an existing fixture file: 20260310000200 = expense-report
@@ -86,30 +86,30 @@ describe('watcher', () => {
     }), 'utf8');
 
     const updated = await waitFor(
-      () => ctx.manifest[id]?.title === 'Updated Expense Report Title'
+      () => ctx.noteCache[id]?.title === 'Updated Expense Report Title'
     );
     expect(updated).toBe(true);
   });
 
-  it('detects deleted file and removes from manifest', async () => {
-    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
+  it('detects deleted file and removes from noteCache', async () => {
+    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.noteCache);
     await waitForWatcherReady(watcher);
 
     // Use an existing fixture: 20260316000000 = confirm-venue-offsite
     const id = '20260316000000';
     const filepath = path.join(ctx.vaultPath, 'notes', id + '.md');
 
-    expect(ctx.manifest[id]).toBeDefined();
+    expect(ctx.noteCache[id]).toBeDefined();
 
     fs.unlinkSync(filepath);
 
-    const removed = await waitFor(() => ctx.manifest[id] === undefined);
+    const removed = await waitFor(() => ctx.noteCache[id] === undefined);
     expect(removed).toBe(true);
-    expect(ctx.manifest[id]).toBeUndefined();
+    expect(ctx.noteCache[id]).toBeUndefined();
   });
 
   it('detects Obsidian-style write (rename from tmp)', async () => {
-    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
+    watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.noteCache);
     await waitForWatcherReady(watcher);
 
     const id = '20260319110000';
@@ -127,8 +127,8 @@ describe('watcher', () => {
     }), 'utf8');
     fs.renameSync(tmpPath, finalPath);
 
-    const found = await waitFor(() => ctx.manifest[id] !== undefined);
+    const found = await waitFor(() => ctx.noteCache[id] !== undefined);
     expect(found).toBe(true);
-    expect(ctx.manifest[id].title).toBe('Obsidian Write Test');
+    expect(ctx.noteCache[id].title).toBe('Obsidian Write Test');
   });
 });

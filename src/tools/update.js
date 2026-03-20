@@ -3,7 +3,7 @@
 const fs = require('fs');
 const { readNote, writeNote, nowTimestamp } = require('../utils/frontmatter');
 const { extractLinks } = require('../utils/links');
-const { addToManifest } = require('../manifest');
+const { addToCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
 
 const TYPE_TO_FOLDER = {
@@ -16,12 +16,12 @@ const TYPE_TO_FOLDER = {
  * Update an existing note: patch frontmatter fields, optionally replace body.
  * Uses atomic write (tmp + rename) to avoid corruption if Obsidian has file open.
  * @param {object} args - { id, content, title, metadata }
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ id: string, updated: boolean }}
  */
 async function updateImpl(args, ctx) {
   const { id, content: newContent, title, metadata } = args;
-  const { db, manifest, vaultPath } = ctx;
+  const { db, noteCache, vaultPath } = ctx;
 
   const filepath = idToPath(vaultPath, id);
 
@@ -74,8 +74,8 @@ async function updateImpl(args, ctx) {
   const links = extractLinks(id, data, body);
   db.upsertNoteLinks(id, links);
 
-  // Update manifest
-  addToManifest(manifest, id, {
+  // Update noteCache
+  addToCache(noteCache, id, {
     type: data.type || 'note',
     title: data.title || id,
     folder: TYPE_TO_FOLDER[data.type] || 'notes',

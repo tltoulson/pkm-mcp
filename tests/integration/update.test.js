@@ -84,9 +84,9 @@ describe('updateImpl', () => {
     ).rejects.toThrow();
   });
 
-  it('manifest reflects changes after update', async () => {
+  it('noteCache reflects changes after update', async () => {
     await updateImpl({ id: TASK_ID, metadata: { gtd: 'waiting', priority: 'high' } }, ctx);
-    const entry = ctx.manifest[TASK_ID];
+    const entry = ctx.noteCache[TASK_ID];
     expect(entry).toBeDefined();
     expect(entry.gtd).toBe('waiting');
     expect(entry.priority).toBe('high');

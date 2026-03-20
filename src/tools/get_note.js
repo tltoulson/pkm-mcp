@@ -5,9 +5,9 @@ const { idToPath } = require('../utils/timestamp');
 
 /**
  * Get a single note by slug, reading directly from disk.
- * Works for superseded notes too (reads disk, bypasses manifest).
+ * Works for superseded notes too (reads disk, bypasses noteCache).
  * @param {object} args - { id }
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ id: string, ...frontmatter, body: string }}
  */
 async function getNoteImpl(args, ctx) {

@@ -7,12 +7,12 @@ const { extractWikilinks } = require('../utils/frontmatter');
  * Traverse an index note and fetch its linked notes (optionally two levels deep).
  * Useful for loading a topic cluster into context in one call.
  * @param {object} args - { id, depth }
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ root: object, linked: Array, total_size: number }}
  */
 async function traverseIndexImpl(args, ctx) {
   const { id, depth = 1 } = args;
-  const { db, manifest } = ctx;
+  const { db, noteCache } = ctx;
 
   // Get root note from disk
   const root = await getNoteImpl({ id }, ctx);
@@ -33,13 +33,13 @@ async function traverseIndexImpl(args, ctx) {
     visited.add(slug);
 
     let note;
-    const manifestEntry = manifest[slug];
-    if (manifestEntry) {
+    const cacheEntry = noteCache[slug];
+    if (cacheEntry) {
       // Fetch full content from db
       const bodies = db.getNotesContent([slug]);
-      note = { ...manifestEntry, body: bodies.get(slug) || '' };
+      note = { ...cacheEntry, body: bodies.get(slug) || '' };
     } else {
-      // Try disk (superseded or missing from manifest)
+      // Try disk (superseded or missing from noteCache)
       try {
         note = await getNoteImpl({ id: slug }, ctx);
       } catch {
@@ -56,7 +56,7 @@ async function traverseIndexImpl(args, ctx) {
         if (!secondSlug || visited.has(secondSlug)) continue;
         visited.add(secondSlug);
 
-        const secondEntry = manifest[secondSlug];
+        const secondEntry = noteCache[secondSlug];
         if (secondEntry) {
           const bodies = db.getNotesContent([secondSlug]);
           linked.push({ ...secondEntry, body: bodies.get(secondSlug) || '' });

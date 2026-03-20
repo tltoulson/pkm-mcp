@@ -5,7 +5,7 @@ const fs = require('fs');
 const chokidar = require('chokidar');
 const matter = require('gray-matter');
 const { extractLinks } = require('./utils/links');
-const { addToManifest, removeFromManifest } = require('./manifest');
+const { addToCache, removeFromCache } = require('./noteCache');
 const { pathToId } = require('./utils/timestamp');
 
 /**
@@ -25,13 +25,13 @@ const TYPE_TO_FOLDER = {
 
 /**
  * Start a chokidar file watcher on the vault directory.
- * Keeps the db and manifest in sync with file system changes.
+ * Keeps the db and noteCache in sync with file system changes.
  * @param {string} vaultPath
  * @param {object} db
- * @param {object} manifest
+ * @param {object} noteCache
  * @returns {chokidar.FSWatcher}
  */
-function startWatcher(vaultPath, db, manifest) {
+function startWatcher(vaultPath, db, noteCache) {
   const notesDir = path.join(vaultPath, 'notes');
   const watcher = chokidar.watch(notesDir, {
     ignored: /(^|[\/\\])\../, // ignore hidden files/dirs
@@ -48,7 +48,7 @@ function startWatcher(vaultPath, db, manifest) {
   }
 
   /**
-   * Handle add/change events: parse file, update db and manifest.
+   * Handle add/change events: parse file, update db and noteCache.
    */
   function handleUpsert(filepath) {
     if (!filepath.endsWith('.md')) return;
@@ -86,7 +86,7 @@ function startWatcher(vaultPath, db, manifest) {
     const links = extractLinks(id, frontmatterData, bodyContent);
     db.upsertNoteLinks(id, links);
 
-    addToManifest(manifest, id, {
+    addToCache(noteCache, id, {
       type,
       title: title || id,
       folder,
@@ -99,13 +99,13 @@ function startWatcher(vaultPath, db, manifest) {
   }
 
   /**
-   * Handle unlink events: remove from db and manifest.
+   * Handle unlink events: remove from db and noteCache.
    */
   function handleDelete(filepath) {
     if (!filepath.endsWith('.md')) return;
     const id = toId(filepath);
     db.deleteNote(id);
-    removeFromManifest(manifest, id);
+    removeFromCache(noteCache, id);
   }
 
   watcher.on('add', handleUpsert);

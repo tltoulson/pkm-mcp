@@ -5,7 +5,7 @@ const express = require('express');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { initDb } = require('./db');
-const { initManifest } = require('./manifest');
+const { initNoteCache } = require('./noteCache');
 const { startWatcher } = require('./watcher');
 const { registerAll } = require('./tools/index');
 
@@ -25,12 +25,12 @@ async function main() {
     db.scanVault(vaultPath);
   }
 
-  const manifest = initManifest(db);
-  console.log(`Manifest loaded: ${Object.keys(manifest).length} notes`);
+  const noteCache = initNoteCache(db);
+  console.log(`Note cache loaded: ${Object.keys(noteCache).length} notes`);
 
-  const watcher = startWatcher(vaultPath, db, manifest);
+  const watcher = startWatcher(vaultPath, db, noteCache);
 
-  const ctx = { db, manifest, vaultPath };
+  const ctx = { db, noteCache, vaultPath };
 
   // Create single McpServer instance with all tools registered
   const mcpServer = new McpServer({

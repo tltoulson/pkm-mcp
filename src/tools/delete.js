@@ -1,19 +1,19 @@
 'use strict';
 
 const fs = require('fs');
-const { removeFromManifest } = require('../manifest');
+const { removeFromCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
 
 /**
- * Delete a note from the vault, db, and manifest.
+ * Delete a note from the vault, db, and noteCache.
  * Requires confirm_id to match id as a safety check.
  * @param {object} args - { id, confirm_id }
- * @param {object} ctx - { db, manifest, vaultPath }
+ * @param {object} ctx - { db, noteCache, vaultPath }
  * @returns {{ id: string, deleted: boolean }}
  */
 async function deleteImpl(args, ctx) {
   const { id, confirm_id } = args;
-  const { db, manifest, vaultPath } = ctx;
+  const { db, noteCache, vaultPath } = ctx;
 
   // Safety check: confirm_id must match id
   if (confirm_id !== id) {
@@ -32,8 +32,8 @@ async function deleteImpl(args, ctx) {
   // Remove from db
   db.deleteNote(id);
 
-  // Remove from manifest
-  removeFromManifest(manifest, id);
+  // Remove from noteCache
+  removeFromCache(noteCache, id);
 
   return { id, deleted: true };
 }
