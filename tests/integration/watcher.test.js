@@ -48,8 +48,9 @@ describe('watcher', () => {
     watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
     await waitForWatcherReady(watcher);
 
-    const slug = 'tasks/2026-03-19-test-watcher-new';
-    const filepath = path.join(ctx.vaultPath, slug + '.md');
+    // Use a fixed timestamp ID for the new file
+    const id = '20260319100000';
+    const filepath = path.join(ctx.vaultPath, 'notes', id + '.md');
 
     fs.writeFileSync(filepath, matter.stringify('Test content', {
       type: 'task',
@@ -60,19 +61,19 @@ describe('watcher', () => {
       modified: '2026-03-19T10:00:00',
     }), 'utf8');
 
-    const found = await waitFor(() => ctx.manifest[slug] !== undefined);
+    const found = await waitFor(() => ctx.manifest[id] !== undefined);
     expect(found).toBe(true);
-    expect(ctx.manifest[slug]).toBeDefined();
-    expect(ctx.manifest[slug].title).toBe('Test watcher note');
+    expect(ctx.manifest[id]).toBeDefined();
+    expect(ctx.manifest[id].title).toBe('Test watcher note');
   });
 
   it('detects modified file and updates manifest', async () => {
     watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
     await waitForWatcherReady(watcher);
 
-    // Use an existing fixture file
-    const slug = 'tasks/2026-03-10-expense-report';
-    const filepath = path.join(ctx.vaultPath, slug + '.md');
+    // Use an existing fixture file: 20260310000200 = expense-report
+    const id = '20260310000200';
+    const filepath = path.join(ctx.vaultPath, 'notes', id + '.md');
 
     // Overwrite with modified title
     fs.writeFileSync(filepath, matter.stringify('Updated body content', {
@@ -85,7 +86,7 @@ describe('watcher', () => {
     }), 'utf8');
 
     const updated = await waitFor(
-      () => ctx.manifest[slug]?.title === 'Updated Expense Report Title'
+      () => ctx.manifest[id]?.title === 'Updated Expense Report Title'
     );
     expect(updated).toBe(true);
   });
@@ -94,25 +95,26 @@ describe('watcher', () => {
     watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
     await waitForWatcherReady(watcher);
 
-    const slug = 'tasks/2026-03-16-confirm-venue-offsite';
-    const filepath = path.join(ctx.vaultPath, slug + '.md');
+    // Use an existing fixture: 20260316000000 = confirm-venue-offsite
+    const id = '20260316000000';
+    const filepath = path.join(ctx.vaultPath, 'notes', id + '.md');
 
-    expect(ctx.manifest[slug]).toBeDefined();
+    expect(ctx.manifest[id]).toBeDefined();
 
     fs.unlinkSync(filepath);
 
-    const removed = await waitFor(() => ctx.manifest[slug] === undefined);
+    const removed = await waitFor(() => ctx.manifest[id] === undefined);
     expect(removed).toBe(true);
-    expect(ctx.manifest[slug]).toBeUndefined();
+    expect(ctx.manifest[id]).toBeUndefined();
   });
 
   it('detects Obsidian-style write (rename from tmp)', async () => {
     watcher = startWatcher(ctx.vaultPath, ctx.db, ctx.manifest);
     await waitForWatcherReady(watcher);
 
-    const slug = 'tasks/2026-03-19-obsidian-write-test';
-    const finalPath = path.join(ctx.vaultPath, slug + '.md');
-    const tmpPath = path.join(ctx.vaultPath, 'tasks', '.tmp-obsidian-write.md');
+    const id = '20260319110000';
+    const finalPath = path.join(ctx.vaultPath, 'notes', id + '.md');
+    const tmpPath = path.join(ctx.vaultPath, 'notes', '.tmp-obsidian-write.md');
 
     // Write to tmp then rename (Obsidian's atomic write pattern)
     fs.writeFileSync(tmpPath, matter.stringify('Obsidian write test body', {
@@ -125,8 +127,8 @@ describe('watcher', () => {
     }), 'utf8');
     fs.renameSync(tmpPath, finalPath);
 
-    const found = await waitFor(() => ctx.manifest[slug] !== undefined);
+    const found = await waitFor(() => ctx.manifest[id] !== undefined);
     expect(found).toBe(true);
-    expect(ctx.manifest[slug].title).toBe('Obsidian Write Test');
+    expect(ctx.manifest[id].title).toBe('Obsidian Write Test');
   });
 });

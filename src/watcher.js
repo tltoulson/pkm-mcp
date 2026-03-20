@@ -6,6 +6,22 @@ const chokidar = require('chokidar');
 const matter = require('gray-matter');
 const { extractLinks } = require('./utils/links');
 const { addToManifest, removeFromManifest } = require('./manifest');
+const { pathToId } = require('./utils/timestamp');
+
+/**
+ * Maps note type to logical folder name.
+ */
+const TYPE_TO_FOLDER = {
+  task: 'tasks',
+  project: 'projects',
+  journal: 'journal',
+  note: 'notes',
+  person: 'people',
+  meeting: 'meetings',
+  decision: 'decisions',
+  reference: 'references',
+  index: 'indexes',
+};
 
 /**
  * Start a chokidar file watcher on the vault directory.
@@ -16,7 +32,8 @@ const { addToManifest, removeFromManifest } = require('./manifest');
  * @returns {chokidar.FSWatcher}
  */
 function startWatcher(vaultPath, db, manifest) {
-  const watcher = chokidar.watch(vaultPath, {
+  const notesDir = path.join(vaultPath, 'notes');
+  const watcher = chokidar.watch(notesDir, {
     ignored: /(^|[\/\\])\../, // ignore hidden files/dirs
     persistent: true,
     ignoreInitial: true,
@@ -24,12 +41,10 @@ function startWatcher(vaultPath, db, manifest) {
   });
 
   /**
-   * Derive the slug from an absolute filepath.
+   * Derive the note ID from an absolute filepath.
    */
-  function toSlug(filepath) {
-    return path.relative(vaultPath, filepath)
-      .replace(/\\/g, '/')
-      .replace(/\.md$/, '');
+  function toId(filepath) {
+    return pathToId(filepath);
   }
 
   /**
@@ -38,7 +53,7 @@ function startWatcher(vaultPath, db, manifest) {
   function handleUpsert(filepath) {
     if (!filepath.endsWith('.md')) return;
 
-    const slug = toSlug(filepath);
+    const id = toId(filepath);
     let frontmatterData = {};
     let bodyContent = '';
 
@@ -52,13 +67,14 @@ function startWatcher(vaultPath, db, manifest) {
       return;
     }
 
-    const folder = slug.split('/')[0];
-    const { type, title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+    const type = frontmatterData.type || 'note';
+    const folder = TYPE_TO_FOLDER[type] || 'notes';
+    const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
     const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
 
-    db.upsertNote(slug, {
-      type: type || 'note',
-      title: title || slug,
+    db.upsertNote(id, {
+      type,
+      title: title || id,
       folder,
       created: created || null,
       modified: modified || null,
@@ -67,12 +83,12 @@ function startWatcher(vaultPath, db, manifest) {
       metadata,
     });
 
-    const links = extractLinks(slug, frontmatterData, bodyContent);
-    db.upsertNoteLinks(slug, links);
+    const links = extractLinks(id, frontmatterData, bodyContent);
+    db.upsertNoteLinks(id, links);
 
-    addToManifest(manifest, slug, {
-      type: type || 'note',
-      title: title || slug,
+    addToManifest(manifest, id, {
+      type,
+      title: title || id,
       folder,
       created: created || null,
       modified: modified || null,
@@ -87,9 +103,9 @@ function startWatcher(vaultPath, db, manifest) {
    */
   function handleDelete(filepath) {
     if (!filepath.endsWith('.md')) return;
-    const slug = toSlug(filepath);
-    db.deleteNote(slug);
-    removeFromManifest(manifest, slug);
+    const id = toId(filepath);
+    db.deleteNote(id);
+    removeFromManifest(manifest, id);
   }
 
   watcher.on('add', handleUpsert);

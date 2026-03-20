@@ -13,7 +13,11 @@
       "Bash(python -m pip install -r c:Codegitpkm-mcprequirements.txt)",
       "Bash(python -c \"import pydantic; print\\(''ok''\\)\")",
       "Bash(npm info:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Code/git/pkm-mcp/**)",
+      "Bash(done)"
     ]
   }
 }

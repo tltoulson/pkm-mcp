@@ -1,8 +1,8 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 const { removeFromManifest } = require('../manifest');
+const { idToPath } = require('../utils/timestamp');
 
 /**
  * Delete a note from the vault, db, and manifest.
@@ -20,7 +20,7 @@ async function deleteImpl(args, ctx) {
     throw new Error(`confirm_id "${confirm_id}" does not match id "${id}"`);
   }
 
-  const filepath = path.join(vaultPath, id + '.md');
+  const filepath = idToPath(vaultPath, id);
 
   if (!fs.existsSync(filepath)) {
     throw new Error(`Note not found: ${id}`);

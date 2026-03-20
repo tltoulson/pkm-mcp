@@ -12,6 +12,21 @@ const { extractLinks } = require('./utils/links');
 const CURRENT_SCHEMA_VERSION = '1';
 
 /**
+ * Maps note type to logical folder name.
+ */
+const TYPE_TO_FOLDER = {
+  task: 'tasks',
+  project: 'projects',
+  journal: 'journal',
+  note: 'notes',
+  person: 'people',
+  meeting: 'meetings',
+  decision: 'decisions',
+  reference: 'references',
+  index: 'indexes',
+};
+
+/**
  * SQL for vault tables (dropped and recreated on schema version mismatch).
  */
 const VAULT_TABLE_SQL = `
@@ -101,7 +116,7 @@ function initDb(indexPath) {
       INSERT OR IGNORE INTO note_links (source_slug, target_slug, link_type)
       VALUES (?, ?, ?)
     `),
-    resolveSlug: raw.prepare("SELECT id FROM notes WHERE id LIKE ? OR id LIKE ?"),
+    resolveSlugExact: raw.prepare('SELECT id FROM notes WHERE id = ?'),
     getAllNotes: raw.prepare('SELECT * FROM notes'),
     ftsSearch: raw.prepare(`
       SELECT note_id, bm25(notes_fts, 0, 10, 10, 1) as rank
@@ -116,16 +131,16 @@ function initDb(indexPath) {
 
   /**
    * Insert or replace a note in notes + notes_fts tables.
-   * @param {string} slug
+   * @param {string} id
    * @param {object} fields
    */
-  function upsertNote(slug, { type, title, folder, created, modified, superseded_by, supersedes, metadata }) {
+  function upsertNote(id, { type, title, folder, created, modified, superseded_by, supersedes, metadata }) {
     raw.transaction(() => {
       stmts.upsertNote.run({
-        id: slug,
+        id,
         type: type || 'note',
-        title: title || slug,
-        folder: folder || slug.split('/')[0],
+        title: title || id,
+        folder: folder || TYPE_TO_FOLDER[type] || 'notes',
         created: created || null,
         modified: modified || null,
         superseded_by: superseded_by || null,
@@ -134,58 +149,56 @@ function initDb(indexPath) {
       });
 
       // FTS: DELETE then INSERT (FTS5 has no ON CONFLICT support)
-      stmts.deleteFts.run(slug);
+      stmts.deleteFts.run(id);
       const aliasesStr = (metadata && metadata.aliases)
         ? (Array.isArray(metadata.aliases) ? metadata.aliases.join(' ') : String(metadata.aliases))
         : '';
       // Store body content in metadata.body for FTS if present
       const bodyContent = (metadata && metadata._body) ? metadata._body : '';
-      stmts.insertFts.run(slug, title || slug, aliasesStr, bodyContent);
+      stmts.insertFts.run(id, title || id, aliasesStr, bodyContent);
     })();
   }
 
   /**
-   * Resolve an Obsidian short-form slug (no folder prefix) to a full slug.
-   * If target contains '/', return as-is (already fully qualified).
+   * Resolve a wikilink target to a note ID.
+   * In the flat vault, wikilinks are already full IDs.
+   * Just look up by exact match; return as-is if not found.
    * @param {string} target
-   * @returns {string} full slug or original if not found
+   * @returns {string} id or original if not found
    */
   function resolveSlug(target) {
     if (!target) return target;
-    if (target.includes('/')) return target;
-    // Try exact suffix match (e.g. "2025-11-01-derek-gordon") first,
-    // then try trailing partial match (e.g. "derek-gordon" matching "...2025-11-01-derek-gordon")
-    const row = stmts.resolveSlug.get(`%/${target}`, `%-${target}`);
+    const row = stmts.resolveSlugExact.get(target);
     return row ? row.id : target;
   }
 
   /**
-   * Delete all links for a slug (as source), re-insert resolved links.
+   * Delete all links for an id (as source), re-insert resolved links.
    * Pass 2 of scan_vault calls this after all notes are inserted.
-   * @param {string} slug
+   * @param {string} id
    * @param {Array} links - [{source_slug, target_slug, link_type}]
    */
-  function upsertNoteLinks(slug, links) {
+  function upsertNoteLinks(id, links) {
     raw.transaction(() => {
-      stmts.deleteNoteLinksSource.run(slug);
+      stmts.deleteNoteLinksSource.run(id);
       for (const link of links) {
-        // Resolve short-form Obsidian slugs
+        // Resolve wikilink targets
         const resolved = resolveSlug(link.target_slug);
-        stmts.insertLink.run(slug, resolved, link.link_type);
+        stmts.insertLink.run(id, resolved, link.link_type);
       }
     })();
   }
 
   /**
    * Delete a note and all its link references.
-   * @param {string} slug
+   * @param {string} id
    */
-  function deleteNote(slug) {
+  function deleteNote(id) {
     raw.transaction(() => {
-      stmts.deleteNote.run(slug);
-      stmts.deleteNoteLinksSource.run(slug);
-      stmts.deleteNoteLinksTarget.run(slug);
-      stmts.deleteFts.run(slug);
+      stmts.deleteNote.run(id);
+      stmts.deleteNoteLinksSource.run(id);
+      stmts.deleteNoteLinksTarget.run(id);
+      stmts.deleteFts.run(id);
     })();
   }
 
@@ -214,68 +227,58 @@ function initDb(indexPath) {
   }
 
   /**
-   * Get slugs linked to/from an anchor note.
-   * @param {string} anchorSlug
+   * Get IDs linked to/from an anchor note.
+   * @param {string} anchorId
    * @param {'to'|'from'|'any'} direction
    * @returns {Set<string>}
    */
-  function getLinked(anchorSlug, direction) {
+  function getLinked(anchorId, direction) {
     const result = new Set();
     if (direction === 'to' || direction === 'any') {
-      for (const row of stmts.getLinkedTo.all(anchorSlug)) result.add(row.slug);
+      for (const row of stmts.getLinkedTo.all(anchorId)) result.add(row.slug);
     }
     if (direction === 'from' || direction === 'any') {
-      for (const row of stmts.getLinkedFrom.all(anchorSlug)) result.add(row.slug);
+      for (const row of stmts.getLinkedFrom.all(anchorId)) result.add(row.slug);
     }
     return result;
   }
 
   /**
-   * Fetch body content for multiple slugs in one query.
-   * @param {string[]} slugs
+   * Fetch body content for multiple IDs in one query.
+   * @param {string[]} ids
    * @returns {Map<string, string>}
    */
-  function getNotesContent(slugs) {
-    if (!slugs || slugs.length === 0) return new Map();
-    const placeholders = slugs.map(() => '?').join(', ');
+  function getNotesContent(ids) {
+    if (!ids || ids.length === 0) return new Map();
+    const placeholders = ids.map(() => '?').join(', ');
     const rows = raw.prepare(
       `SELECT note_id, content FROM notes_fts WHERE note_id IN (${placeholders})`
-    ).all(...slugs);
+    ).all(...ids);
     return new Map(rows.map(r => [r.note_id, r.content || '']));
   }
 
   /**
    * Two-pass vault scan.
-   * Pass 1: walk all .md files, parse frontmatter+body, upsertNote.
+   * Pass 1: walk all .md files at vault root (flat), parse frontmatter+body, upsertNote.
    * Pass 2: extract links from stored data, upsertNoteLinks.
    * This ensures all note targets exist in DB before link resolution.
    * @param {string} vaultPath
    */
   function scanVault(vaultPath) {
-    // Collect all .md files recursively
-    const mdFiles = [];
-    function walk(dir) {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          // Skip hidden directories
-          if (!entry.name.startsWith('.')) walk(full);
-        } else if (entry.isFile() && entry.name.endsWith('.md')) {
-          mdFiles.push(full);
-        }
-      }
-    }
-    walk(vaultPath);
+    // All notes live in vaultPath/notes/ — scan only that subdirectory
+    const notesDir = path.join(vaultPath, 'notes');
+    if (!fs.existsSync(notesDir)) return;
+    const mdFiles = fs.readdirSync(notesDir)
+      .filter(name => name.endsWith('.md') && !name.startsWith('.'))
+      .map(name => path.join(notesDir, name));
 
-    // Map of slug → { frontmatterData, bodyContent } for pass 2
+    // Map of id → { frontmatterData, bodyContent } for pass 2
     const parsed = new Map();
 
     // Pass 1: insert all notes
     const pass1 = raw.transaction(() => {
       for (const filepath of mdFiles) {
-        const slug = path.relative(vaultPath, filepath)
-          .replace(/\\/g, '/')
-          .replace(/\.md$/, '');
+        const id = path.basename(filepath, '.md');
 
         let frontmatterData = {};
         let bodyContent = '';
@@ -289,17 +292,18 @@ function initDb(indexPath) {
           continue;
         }
 
-        const folder = slug.split('/')[0];
+        const type = frontmatterData.type || 'note';
+        const folder = TYPE_TO_FOLDER[type] || 'notes';
 
         // Extract universal fields; everything else goes into metadata
-        const { type, title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+        const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
 
         // Store body in metadata._body for FTS indexing
         const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
 
-        upsertNote(slug, {
-          type: type || 'note',
-          title: title || slug,
+        upsertNote(id, {
+          type,
+          title: title || id,
           folder,
           created: created || null,
           modified: modified || null,
@@ -308,16 +312,16 @@ function initDb(indexPath) {
           metadata,
         });
 
-        parsed.set(slug, { frontmatterData, bodyContent });
+        parsed.set(id, { frontmatterData, bodyContent });
       }
     });
     pass1();
 
-    // Pass 2: insert all links (all notes exist now, so slug resolution works)
+    // Pass 2: insert all links (all notes exist now, so id resolution works)
     const pass2 = raw.transaction(() => {
-      for (const [slug, { frontmatterData, bodyContent }] of parsed) {
-        const links = extractLinks(slug, frontmatterData, bodyContent);
-        upsertNoteLinks(slug, links);
+      for (const [id, { frontmatterData, bodyContent }] of parsed) {
+        const links = extractLinks(id, frontmatterData, bodyContent);
+        upsertNoteLinks(id, links);
       }
     });
     pass2();

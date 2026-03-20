@@ -3,7 +3,6 @@
 const { register: registerCapture }         = require('./capture');
 const { register: registerUpdate }          = require('./update');
 const { register: registerDelete }          = require('./delete');
-const { register: registerRelocate }        = require('./relocate');
 const { register: registerQuery }           = require('./query');
 const { register: registerBatchQuery }      = require('./batch_query');
 const { register: registerGetNote }         = require('./get_note');
@@ -21,7 +20,6 @@ function registerAll(mcpServer, ctx) {
   registerCapture(mcpServer, ctx);
   registerUpdate(mcpServer, ctx);
   registerDelete(mcpServer, ctx);
-  registerRelocate(mcpServer, ctx);
   registerQuery(mcpServer, ctx);
   registerBatchQuery(mcpServer, ctx);
   registerGetNote(mcpServer, ctx);

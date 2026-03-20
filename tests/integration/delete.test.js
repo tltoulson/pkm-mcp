@@ -17,10 +17,11 @@ afterEach(() => {
 });
 
 describe('deleteImpl', () => {
-  const DELETE_ID = 'tasks/2026-03-10-expense-report';
+  // 20260310000200 = expense-report task
+  const DELETE_ID = '20260310000200';
 
   it('deletes file with matching confirm_id', async () => {
-    const filepath = path.join(ctx.vaultPath, DELETE_ID + '.md');
+    const filepath = path.join(ctx.vaultPath, 'notes', DELETE_ID + '.md');
     expect(fs.existsSync(filepath)).toBe(true);
 
     await deleteImpl({ id: DELETE_ID, confirm_id: DELETE_ID }, ctx);
@@ -47,7 +48,7 @@ describe('deleteImpl', () => {
   });
 
   it('confirm_id mismatch: throws error, file NOT deleted', async () => {
-    const filepath = path.join(ctx.vaultPath, DELETE_ID + '.md');
+    const filepath = path.join(ctx.vaultPath, 'notes', DELETE_ID + '.md');
 
     await expect(
       deleteImpl({ id: DELETE_ID, confirm_id: 'wrong-id' }, ctx)
@@ -58,7 +59,7 @@ describe('deleteImpl', () => {
   });
 
   it('non-existent id: throws error', async () => {
-    const ghostId = 'tasks/does-not-exist';
+    const ghostId = '99999999999999';
     await expect(
       deleteImpl({ id: ghostId, confirm_id: ghostId }, ctx)
     ).rejects.toThrow();

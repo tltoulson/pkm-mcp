@@ -17,16 +17,17 @@ afterEach(() => {
 });
 
 describe('updateImpl', () => {
-  const TASK_ID = 'tasks/2026-03-01-update-runbook';
+  // 20260301000300 = update-runbook task (gtd: inbox, status: todo)
+  const TASK_ID = '20260301000300';
 
   it('partial metadata: only specified fields change, untouched fields preserved', async () => {
-    const before = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const before = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(before.data.gtd).toBe('inbox');
     expect(before.data.status).toBe('todo');
 
     await updateImpl({ id: TASK_ID, metadata: { gtd: 'next' } }, ctx);
 
-    const after = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const after = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(after.data.gtd).toBe('next');
     // status should be unchanged
     expect(after.data.status).toBe('todo');
@@ -36,27 +37,27 @@ describe('updateImpl', () => {
     expect(after.data.title).toBe('Update on-call runbook with new escalation paths');
   });
 
-  it('title change only updates frontmatter title, not filename/slug', async () => {
+  it('title change only updates frontmatter title, not filename/id', async () => {
     await updateImpl({ id: TASK_ID, title: 'Updated Title' }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(data.title).toBe('Updated Title');
-    // The file still exists at the original slug
+    // The file still exists at the original id
     const fs = require('fs');
-    expect(fs.existsSync(path.join(ctx.vaultPath, TASK_ID + '.md'))).toBe(true);
+    expect(fs.existsSync(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'))).toBe(true);
   });
 
   it('status done transition: frontmatter updated, file not moved', async () => {
     await updateImpl({ id: TASK_ID, metadata: { status: 'done', gtd: 'done' } }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(data.status).toBe('done');
-    // File still at original location (not moved to tasks/done/ or anything)
+    // File still at original location
     const fs = require('fs');
-    expect(fs.existsSync(path.join(ctx.vaultPath, TASK_ID + '.md'))).toBe(true);
+    expect(fs.existsSync(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'))).toBe(true);
   });
 
   it('status done auto-stamps completed field', async () => {
     await updateImpl({ id: TASK_ID, metadata: { status: 'done' } }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(data.completed).toBeDefined();
     expect(data.completed).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
@@ -67,7 +68,7 @@ describe('updateImpl', () => {
     await updateImpl({ id: TASK_ID, metadata: { status: 'done', completed: firstTime } }, ctx);
     // Then update again
     await updateImpl({ id: TASK_ID, metadata: { status: 'done' } }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(data.completed).toBe(firstTime);
   });
 
@@ -79,7 +80,7 @@ describe('updateImpl', () => {
 
   it('throws for non-existent id', async () => {
     await expect(
-      updateImpl({ id: 'tasks/does-not-exist', metadata: { gtd: 'next' } }, ctx)
+      updateImpl({ id: '99999999999999', metadata: { gtd: 'next' } }, ctx)
     ).rejects.toThrow();
   });
 
@@ -92,27 +93,27 @@ describe('updateImpl', () => {
   });
 
   it('always stamps modified timestamp', async () => {
-    const before = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const before = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     const originalModified = before.data.modified;
     // Small delay to ensure timestamp changes
     await new Promise(r => setTimeout(r, 10));
     await updateImpl({ id: TASK_ID, metadata: { source: 'updated' } }, ctx);
-    const after = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const after = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(after.data.modified).not.toBe(originalModified);
   });
 
   it('replaces body content when content arg is provided', async () => {
     const newBody = 'Completely new body content.';
     await updateImpl({ id: TASK_ID, content: newBody }, ctx);
-    const { content } = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const { content } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(content.trim()).toBe(newBody);
   });
 
   it('preserves body content when content arg is not provided', async () => {
-    const before = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const before = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     const originalContent = before.content;
     await updateImpl({ id: TASK_ID, metadata: { tag: 'test' } }, ctx);
-    const after = readNote(path.join(ctx.vaultPath, TASK_ID + '.md'));
+    const after = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(after.content).toBe(originalContent);
   });
 });

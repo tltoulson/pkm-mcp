@@ -19,19 +19,13 @@ afterEach(() => {
 });
 
 /**
- * Count .md files in the fixture vault recursively.
+ * Count .md files in the fixture vault notes/ subdirectory.
  */
 function countMdFiles(dir) {
-  let count = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && !entry.name.startsWith('.')) {
-      count += countMdFiles(full);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      count++;
-    }
-  }
-  return count;
+  const notesDir = path.join(dir, 'notes');
+  return fs.readdirSync(notesDir)
+    .filter(name => name.endsWith('.md') && !name.startsWith('.'))
+    .length;
 }
 
 describe('scanVault', () => {
@@ -42,52 +36,51 @@ describe('scanVault', () => {
   });
 
   it('note_links populated: specific wikilink appears in note_links', () => {
-    // tasks/2026-02-01-migrate-auth-service has project: [[projects/2026-01-15-platform-modernization]]
+    // 20260201000100 (migrate-auth-service) has project: [[20260115000100]] (platform-modernization)
     const link = ctx.db.raw.prepare(`
       SELECT * FROM note_links
       WHERE source_slug = ? AND target_slug = ?
     `).get(
-      'tasks/2026-02-01-migrate-auth-service',
-      'projects/2026-01-15-platform-modernization'
+      '20260201000100',
+      '20260115000100'
     );
     expect(link).toBeDefined();
     expect(link.link_type).toBe('project');
   });
 
-  it('Obsidian short-form slugs resolved: body link without folder prefix resolves correctly', () => {
-    // notes/2026-02-10-monitoring-research body contains [[decisions/2026-03-15-monitoring-stack]]
-    // which is a full slug — but we also want to test that short-form would resolve
-    // Let's check the full slug link is present
+  it('body wikilinks appear in note_links', () => {
+    // 20260210000200 (monitoring-research) body contains [[20260315000200]]
     const links = ctx.db.raw.prepare(`
       SELECT * FROM note_links WHERE source_slug = ?
-    `).all('notes/2026-02-10-monitoring-research');
+    `).all('20260210000200');
 
     expect(links.length).toBeGreaterThan(0);
     const targets = links.map(l => l.target_slug);
-    expect(targets).toContain('decisions/2026-03-15-monitoring-stack');
+    expect(targets).toContain('20260315000200');
   });
 
-  it('resolveSlug works for short-form slugs (no folder prefix)', () => {
-    // 'derek-gordon' should resolve to 'people/2025-11-01-derek-gordon'
-    const resolved = ctx.db.resolveSlug('derek-gordon');
-    expect(resolved).toBe('people/2025-11-01-derek-gordon');
+  it('resolveSlug returns the ID if it exists', () => {
+    // Exact ID lookup
+    const resolved = ctx.db.resolveSlug('20251101000000');
+    expect(resolved).toBe('20251101000000');
   });
 
-  it('resolveSlug returns original if already has folder prefix', () => {
-    const full = 'people/2025-11-01-derek-gordon';
-    expect(ctx.db.resolveSlug(full)).toBe(full);
+  it('resolveSlug returns original if not found', () => {
+    const result = ctx.db.resolveSlug('nonexistent-id-xyz');
+    expect(result).toBe('nonexistent-id-xyz');
   });
 
   it('superseded notes in SQLite: notes with superseded_by are in notes table', () => {
+    // 20251115000000 (old-api-versioning) is superseded
     const row = ctx.db.raw.prepare('SELECT * FROM notes WHERE id = ?')
-      .get('decisions/2025-11-15-old-api-versioning');
+      .get('20251115000000');
     expect(row).toBeDefined();
     expect(row.superseded_by).toBeTruthy();
   });
 
   it('superseded notes NOT in manifest', () => {
-    expect(ctx.manifest['decisions/2025-11-15-old-api-versioning']).toBeUndefined();
-    expect(ctx.manifest['notes/2025-12-01-old-api-principles']).toBeUndefined();
+    expect(ctx.manifest['20251115000000']).toBeUndefined();
+    expect(ctx.manifest['20251201000000']).toBeUndefined();
   });
 
   it('schema version mismatch triggers rebuild', () => {
@@ -115,28 +108,48 @@ describe('scanVault', () => {
   });
 
   it('attendees links in meetings are stored as body links', () => {
-    // meetings/2026-01-15-platform-kickoff has attendees with wikilinks
+    // 20260115000200 (platform-kickoff) has attendees with wikilinks
     const links = ctx.db.raw.prepare(`
       SELECT * FROM note_links
-      WHERE source_slug = 'meetings/2026-01-15-platform-kickoff'
+      WHERE source_slug = '20260115000200'
       AND link_type = 'body'
     `).all();
     const targets = links.map(l => l.target_slug);
     // attendees are extracted as body links
-    expect(targets.some(t => t.includes('alex-rivera') || t.includes('james-okafor'))).toBe(true);
+    expect(targets.some(t => t === '20250601000100' || t === '20260110000200')).toBe(true);
   });
 
   it('related field links extracted with link_type="related"', () => {
-    // projects/2026-01-15-platform-modernization has related: [[decisions/2026-01-14-choose-auth-provider]]
+    // 20260115000100 (platform-modernization) has related: [[20260114000000]]
     const link = ctx.db.raw.prepare(`
       SELECT * FROM note_links
       WHERE source_slug = ?
       AND target_slug = ?
       AND link_type = 'related'
     `).get(
-      'projects/2026-01-15-platform-modernization',
-      'decisions/2026-01-14-choose-auth-provider'
+      '20260115000100',
+      '20260114000000'
     );
     expect(link).toBeDefined();
+  });
+
+  it('folder field is derived from type, not from path', () => {
+    // 20260115000100 is type=project, so folder should be 'projects'
+    const row = ctx.db.raw.prepare('SELECT folder FROM notes WHERE id = ?').get('20260115000100');
+    expect(row).toBeDefined();
+    expect(row.folder).toBe('projects');
+
+    // 20260301000300 is type=task, so folder should be 'tasks'
+    const taskRow = ctx.db.raw.prepare('SELECT folder FROM notes WHERE id = ?').get('20260301000300');
+    expect(taskRow).toBeDefined();
+    expect(taskRow.folder).toBe('tasks');
+  });
+
+  it('IDs are flat 14-digit timestamps (no folder prefix)', () => {
+    // All IDs should be 14-digit numbers, not folder/date-slug format
+    const rows = ctx.db.raw.prepare('SELECT id FROM notes LIMIT 10').all();
+    rows.forEach(row => {
+      expect(row.id).toMatch(/^\d{14}$/);
+    });
   });
 });

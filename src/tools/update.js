@@ -1,10 +1,16 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 const { readNote, writeNote, nowTimestamp } = require('../utils/frontmatter');
 const { extractLinks } = require('../utils/links');
 const { addToManifest } = require('../manifest');
+const { idToPath } = require('../utils/timestamp');
+
+const TYPE_TO_FOLDER = {
+  task: 'tasks', project: 'projects', journal: 'journal',
+  note: 'notes', person: 'people', meeting: 'meetings',
+  decision: 'decisions', reference: 'references', index: 'indexes',
+};
 
 /**
  * Update an existing note: patch frontmatter fields, optionally replace body.
@@ -17,7 +23,7 @@ async function updateImpl(args, ctx) {
   const { id, content: newContent, title, metadata } = args;
   const { db, manifest, vaultPath } = ctx;
 
-  const filepath = path.join(vaultPath, id + '.md');
+  const filepath = idToPath(vaultPath, id);
 
   if (!fs.existsSync(filepath)) {
     throw new Error(`Note not found: ${id}`);
@@ -57,7 +63,7 @@ async function updateImpl(args, ctx) {
   db.upsertNote(id, {
     type: data.type || 'note',
     title: data.title || id,
-    folder: id.split('/')[0],
+    folder: TYPE_TO_FOLDER[data.type] || 'notes',
     created: data.created || null,
     modified: data.modified,
     superseded_by: data.superseded_by || null,
@@ -72,7 +78,7 @@ async function updateImpl(args, ctx) {
   addToManifest(manifest, id, {
     type: data.type || 'note',
     title: data.title || id,
-    folder: id.split('/')[0],
+    folder: TYPE_TO_FOLDER[data.type] || 'notes',
     created: data.created || null,
     modified: data.modified,
     superseded_by: data.superseded_by || null,

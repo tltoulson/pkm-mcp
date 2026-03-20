@@ -52,7 +52,7 @@ HTTP MCP Server (Node.js, port 8765)
   │     located at C:\Users\tltou\.pkm-index\vault.db
   │     NOT inside OneDrive — see Design Decision #16
   ├── File watcher (chokidar, debounced 500ms)
-  └── Markdown files (C:\Users\tltou\OneDrive\claud-vault)
+  └── Markdown files (C:\Users\tltou\OneDrive\claud-vault\notes\)
 ```
 
 **Node.js dependencies:**
@@ -75,24 +75,21 @@ SQLite via better-sqlite3. No Docker. No Ollama. No spaCy. No Postgres required.
 claud-vault/
 ├── _system/          ← Claude instructions, type registry, data dictionary,
 │                       query patterns for reviews and contexts
-├── notes/            ← all non-task, non-project notes
-│   ├── people/
-│   ├── meetings/
-│   ├── decisions/
-│   ├── references/
-│   └── indexes/
-├── tasks/            ← ALL tasks, completely flat
-├── projects/         ← ALL projects, completely flat
-└── archive/          ← intentional exile only, never auto-moved here
+├── notes/            ← ALL machine-managed notes (flat, YYYYMMDDHHMMSS.md)
+│                       tasks, projects, meetings, people, decisions — everything
+│                       Type/GTD state lives in frontmatter only
+└── (anything else)   ← Obsidian Bases configs, manually managed folders,
+                        archive — none of this is touched by the MCP server
 
 C:\Users\tltou\.pkm-index\   ← outside OneDrive, never synced
 ├── vault.db
 └── (vault.db-wal, vault.db-shm — transient SQLite files)
 ```
 
-No GTD subfolders. No active/archive splits. GTD state (`gtd`, `status`) lives
-in frontmatter only, queried via manifest. Completing a task is an `update`
-patch — no file move required.
+No type subfolders inside `notes/`. No GTD subfolders. State lives in
+frontmatter fields, queried via manifest. Completing a task is an `update`
+patch — no file move required. The MCP server only reads and writes
+`claud-vault/notes/`. Everything else in the vault root is untouched.
 
 ---
 
@@ -189,10 +186,10 @@ extracted from:
    patterns → stored as `body`
 4. **Note body** — all `[[wikilink]]` patterns → stored as `body`
 
-**Obsidian short-form slug resolution:** Obsidian stores wikilinks using the
-shortest unique filename (`[[note-title]]` not `[[folder/note-title]]`). On
-insert, `resolveSlug` looks up any target without a `/` against
-`notes WHERE id LIKE '%/target'` to get the full vault slug.
+**Wikilink resolution:** In a flat vault, wikilinks are already full IDs
+(e.g. `[[20260301000000]]`). `resolveSlug` does an exact `id = ?` lookup
+— no LIKE pattern needed. The Obsidian short-form resolution complexity
+is eliminated entirely by the flat structure.
 
 **Scan is two-pass:** Pass 1 inserts all notes. Pass 2 inserts all note_links.
 This ensures every target exists in the DB before slug resolution runs.
@@ -644,10 +641,11 @@ SQLite file locking conflicts with OneDrive sync. WAL mode sidecar files
 (`-wal`, `-shm`) compound this. Index at `C:\Users\tltou\.pkm-index\vault.db`.
 Always rebuildable from files in seconds.
 
-**16. Obsidian short-form slug resolution**
-Obsidian stores wikilinks as shortest unique filenames. Without resolution,
-note_links targets don't match full vault slugs. Resolution via
-`notes WHERE id LIKE '%/target'` at insert time.
+**16. Obsidian short-form slug resolution — eliminated**
+The original design required LIKE-pattern slug resolution because Obsidian
+stored wikilinks as shortest unique filenames without folder prefix. In the
+flat vault, filenames are timestamp IDs — wikilinks are already exact IDs.
+`resolveSlug` does a simple exact-match lookup. No LIKE patterns needed.
 
 **17. Node.js rewrite — clean room, not a port**
 The server was rebuilt from scratch in plain CommonJS Node.js. Reasons:

@@ -18,15 +18,33 @@ afterEach(() => {
 });
 
 describe('captureImpl', () => {
-  it('task type lands in tasks/ folder (flat, no subfolders)', async () => {
+  it('created_note_id is a 14-digit timestamp string', async () => {
     const result = await captureImpl(
       { content: 'Do the thing', suggested_type: 'task', title: 'Do the thing' },
       ctx
     );
-    expect(result.created_note_id).toMatch(/^tasks\//);
-    expect(result.created_note_id).not.toMatch(/tasks\/[^/]+\//); // no subdirectory
-    const filepath = path.join(ctx.vaultPath, result.created_note_id + '.md');
+    expect(result.created_note_id).toMatch(/^\d{14}$/);
+  });
+
+  it('file is created at vault root (flat, no subdir)', async () => {
+    const result = await captureImpl(
+      { content: 'Do the thing', suggested_type: 'task', title: 'Do the thing' },
+      ctx
+    );
+    const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
     expect(fs.existsSync(filepath)).toBe(true);
+    // Should be directly at vault root, not in a subdirectory
+    expect(result.created_note_id).not.toContain('/');
+  });
+
+  it('folder field in manifest is derived from type', async () => {
+    const result = await captureImpl(
+      { content: 'Body', suggested_type: 'task', title: 'Task Note' },
+      ctx
+    );
+    const entry = ctx.manifest[result.created_note_id];
+    expect(entry).toBeDefined();
+    expect(entry.folder).toBe('tasks');
   });
 
   it('sets correct frontmatter fields: type, title, created, modified', async () => {
@@ -34,7 +52,7 @@ describe('captureImpl', () => {
       { content: 'Body', suggested_type: 'task', title: 'My Captured Task' },
       ctx
     );
-    const filepath = path.join(ctx.vaultPath, result.created_note_id + '.md');
+    const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
     const { data } = readNote(filepath);
     expect(data.type).toBe('task');
     expect(data.title).toBe('My Captured Task');
@@ -52,25 +70,6 @@ describe('captureImpl', () => {
     expect(ctx.manifest[result.created_note_id].title).toBe('Manifest Test Note');
   });
 
-  it('date prefix is correct and there is no double-dating', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const result = await captureImpl(
-      { content: '', suggested_type: 'task', title: 'My Task' },
-      ctx
-    );
-    const filename = result.created_note_id.split('/').pop();
-    expect(filename.startsWith(today)).toBe(true);
-    // Ensure no double date like 2026-03-19-2026-03-19-my-task
-    const parts = filename.split('-');
-    // First 3 parts are year, month, day (date prefix)
-    const yearPart = parts[0];
-    expect(yearPart).toMatch(/^\d{4}$/);
-    // Fourth part should NOT be another year
-    if (parts.length > 3) {
-      expect(parts[3]).not.toMatch(/^\d{4}$/);
-    }
-  });
-
   it('returns created_note_id and suggested_links', async () => {
     const result = await captureImpl(
       { content: 'Body', suggested_type: 'note', title: 'Result Shape Test' },
@@ -81,7 +80,7 @@ describe('captureImpl', () => {
   });
 
   it('with related_note_ids: adds related field to frontmatter', async () => {
-    const relatedId = 'projects/2026-01-15-platform-modernization';
+    const relatedId = '20260115000100';
     const result = await captureImpl(
       {
         content: 'Body',
@@ -91,7 +90,7 @@ describe('captureImpl', () => {
       },
       ctx
     );
-    const filepath = path.join(ctx.vaultPath, result.created_note_id + '.md');
+    const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
     const { data } = readNote(filepath);
     expect(data.related).toBeDefined();
     const relatedStr = JSON.stringify(data.related);
@@ -99,7 +98,7 @@ describe('captureImpl', () => {
   });
 
   it('suggested_links contains titles for known related notes', async () => {
-    const relatedId = 'projects/2026-01-15-platform-modernization';
+    const relatedId = '20260115000100';
     const result = await captureImpl(
       {
         content: 'Body',
@@ -115,7 +114,7 @@ describe('captureImpl', () => {
     expect(link.title).toBe('Platform Modernization');
   });
 
-  it('suggested_folder override puts note in specified folder', async () => {
+  it('suggested_folder is ignored — folder still derived from type', async () => {
     const result = await captureImpl(
       {
         content: 'Body',
@@ -125,7 +124,11 @@ describe('captureImpl', () => {
       },
       ctx
     );
-    expect(result.created_note_id).toMatch(/^references\//);
+    // ID has no folder prefix
+    expect(result.created_note_id).toMatch(/^\d{14}$/);
+    // folder in manifest should still be 'notes' (from type=note)
+    const entry = ctx.manifest[result.created_note_id];
+    expect(entry.folder).toBe('notes');
   });
 
   it('derives title from first line of content when title not provided', async () => {
@@ -133,24 +136,24 @@ describe('captureImpl', () => {
       { content: '# My Heading Title\n\nBody text', suggested_type: 'note' },
       ctx
     );
-    const filepath = path.join(ctx.vaultPath, result.created_note_id + '.md');
+    const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
     const { data } = readNote(filepath);
     expect(data.title).toBe('My Heading Title');
   });
 
-  it('project type lands in projects/ folder', async () => {
+  it('project type has folder=projects in manifest', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'project', title: 'New Project' },
       ctx
     );
-    expect(result.created_note_id).toMatch(/^projects\//);
+    expect(ctx.manifest[result.created_note_id].folder).toBe('projects');
   });
 
-  it('meeting type lands in meetings/ folder', async () => {
+  it('meeting type has folder=meetings in manifest', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'meeting', title: 'New Meeting' },
       ctx
     );
-    expect(result.created_note_id).toMatch(/^meetings\//);
+    expect(ctx.manifest[result.created_note_id].folder).toBe('meetings');
   });
 });

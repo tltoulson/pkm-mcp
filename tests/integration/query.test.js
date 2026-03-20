@@ -114,10 +114,10 @@ describe('queryImpl — where string operators', () => {
     results.forEach(r => expect(r.title.toLowerCase()).toMatch(/^platform/));
   });
 
-  it('{id: {ends_with: "modernization"}} returns note whose slug ends with modernization', async () => {
-    const results = await queryImpl({ where: { id: { ends_with: 'modernization' } } }, ctx);
+  it('{id: {ends_with: "000100"}} returns notes whose id ends with 000100', async () => {
+    const results = await queryImpl({ where: { id: { ends_with: '000100' } } }, ctx);
     expect(results.length).toBeGreaterThanOrEqual(1);
-    results.forEach(r => expect(r.id).toMatch(/modernization$/));
+    results.forEach(r => expect(r.id).toMatch(/000100$/));
   });
 
   it('string operators are case-insensitive', async () => {
@@ -195,12 +195,12 @@ describe('queryImpl — FTS search', () => {
 // ---------------------------------------------------------------------------
 
 describe('queryImpl — linked filter', () => {
-  const PROJECT_ID = 'projects/2026-01-15-platform-modernization';
+  // 20260115000100 = platform-modernization project
+  const PROJECT_ID = '20260115000100';
 
   it('"from": returns notes that link TO the anchor (backlinks)', async () => {
     const results = await queryImpl({ linked: { id: PROJECT_ID, direction: 'from' } }, ctx);
     expect(results.length).toBeGreaterThan(0);
-    expect(results.some(r => r.id.startsWith('tasks/') || r.id.startsWith('meetings/'))).toBe(true);
   });
 
   it('"to": returns notes the anchor links OUT to', async () => {
@@ -291,8 +291,9 @@ describe('queryImpl — include traversal', () => {
   });
 
   it('included tasks are all non-done tasks linked to their parent project', async () => {
+    // 20260115000100 = platform-modernization
     const results = await queryImpl({
-      where: { id: 'projects/2026-01-15-platform-modernization' },
+      where: { id: '20260115000100' },
       include: {
         open_tasks: {
           linked: { direction: 'from' },
@@ -311,7 +312,7 @@ describe('queryImpl — include traversal', () => {
 
   it('multiple include keys each resolve independently', async () => {
     const results = await queryImpl({
-      where: { id: 'projects/2026-01-15-platform-modernization' },
+      where: { id: '20260115000100' },
       include: {
         open_tasks: { linked: { direction: 'from' }, where: { type: 'task', status: { ne: 'done' } } },
         meetings:   { linked: { direction: 'from' }, where: { type: 'meeting' } },
@@ -326,7 +327,7 @@ describe('queryImpl — include traversal', () => {
 
   it('include without where returns all linked notes', async () => {
     const results = await queryImpl({
-      where: { id: 'projects/2026-01-15-platform-modernization' },
+      where: { id: '20260115000100' },
       include: { all_linked: { linked: { direction: 'from' } } },
     }, ctx);
     expect(results[0]._included.all_linked.length).toBeGreaterThan(0);
@@ -339,7 +340,8 @@ describe('queryImpl — include traversal', () => {
 
 describe('queryImpl — combined filters', () => {
   it('where + search + linked — AND semantics', async () => {
-    const PROJECT_ID = 'projects/2026-01-15-platform-modernization';
+    // 20260115000100 = platform-modernization
+    const PROJECT_ID = '20260115000100';
     const results = await queryImpl({
       where: { type: 'task' },
       search: 'auth',
@@ -358,7 +360,9 @@ describe('queryImpl — superseded notes excluded', () => {
   it('superseded notes do not appear in results', async () => {
     const results = await queryImpl({}, ctx);
     const ids = results.map(r => r.id);
-    expect(ids).not.toContain('decisions/2025-11-15-old-api-versioning');
-    expect(ids).not.toContain('notes/2025-12-01-old-api-principles');
+    // 20251115000000 = old-api-versioning (superseded)
+    expect(ids).not.toContain('20251115000000');
+    // 20251201000000 = old-api-principles (superseded)
+    expect(ids).not.toContain('20251201000000');
   });
 });

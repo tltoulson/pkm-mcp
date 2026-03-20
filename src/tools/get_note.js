@@ -1,7 +1,7 @@
 'use strict';
 
-const path = require('path');
 const { readNote } = require('../utils/frontmatter');
+const { idToPath } = require('../utils/timestamp');
 
 /**
  * Get a single note by slug, reading directly from disk.
@@ -14,7 +14,7 @@ async function getNoteImpl(args, ctx) {
   const { id } = args;
   const { vaultPath } = ctx;
 
-  const filepath = path.join(vaultPath, id + '.md');
+  const filepath = idToPath(vaultPath, id);
   const { data, content } = readNote(filepath);
 
   return { id, ...data, body: content };

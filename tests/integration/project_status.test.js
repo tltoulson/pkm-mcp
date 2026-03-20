@@ -14,8 +14,10 @@ afterEach(() => {
   cleanupTestContext(ctx);
 });
 
-const PLATFORM_ID = 'projects/2026-01-15-platform-modernization';
-const VENDOR_ID = 'projects/2026-02-01-vendor-selection';
+// 20260115000100 = platform-modernization project
+const PLATFORM_ID = '20260115000100';
+// 20260201000200 = vendor-selection project
+const VENDOR_ID = '20260201000200';
 
 describe('projectStatusImpl', () => {
   it('returns the project note', async () => {
@@ -47,18 +49,18 @@ describe('projectStatusImpl', () => {
     const result = await projectStatusImpl({ project_id: PLATFORM_ID }, ctx);
     expect(result.meetings.length).toBeGreaterThan(0);
     result.meetings.forEach(m => expect(m.type).toBe('meeting'));
-    // Specific meetings we know link to this project
+    // 20260115000200 = platform-kickoff meeting
     const meetingIds = result.meetings.map(m => m.id);
-    expect(meetingIds).toContain('meetings/2026-01-15-platform-kickoff');
+    expect(meetingIds).toContain('20260115000200');
   });
 
   it('returns decisions linked via note_links', async () => {
     const result = await projectStatusImpl({ project_id: PLATFORM_ID }, ctx);
     expect(result.decisions.length).toBeGreaterThan(0);
     result.decisions.forEach(d => expect(d.type).toBe('decision'));
-    // Decisions with project field pointing to platform modernization
+    // 20260114000000 = choose-auth-provider decision
     const decisionIds = result.decisions.map(d => d.id);
-    expect(decisionIds).toContain('decisions/2026-01-14-choose-auth-provider');
+    expect(decisionIds).toContain('20260114000000');
   });
 
   it('returns open_count and done_count', async () => {
@@ -77,7 +79,7 @@ describe('projectStatusImpl', () => {
 
   it('throws for non-existent project', async () => {
     await expect(
-      projectStatusImpl({ project_id: 'projects/does-not-exist' }, ctx)
+      projectStatusImpl({ project_id: '99999999999999' }, ctx)
     ).rejects.toThrow();
   });
 });

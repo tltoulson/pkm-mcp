@@ -4,91 +4,91 @@ const require = createRequire(import.meta.url);
 const { extractLinks } = require('../../src/utils/links');
 
 describe('extractLinks', () => {
-  const SOURCE = 'tasks/2026-01-01-test';
+  const SOURCE = '20260101000000';
 
   it('extracts project field as link_type="project"', () => {
-    const fm = { project: '[[projects/my-project]]' };
+    const fm = { project: '[[20260115000100]]' };
     const links = extractLinks(SOURCE, fm, '');
     const link = links.find(l => l.link_type === 'project');
     expect(link).toBeDefined();
-    expect(link.target_slug).toBe('projects/my-project');
+    expect(link.target_slug).toBe('20260115000100');
     expect(link.source_slug).toBe(SOURCE);
   });
 
   it('extracts supersedes field as link_type="supersedes"', () => {
-    const fm = { supersedes: '[[decisions/old-decision]]' };
+    const fm = { supersedes: '[[20251115000000]]' };
     const links = extractLinks(SOURCE, fm, '');
     const link = links.find(l => l.link_type === 'supersedes');
     expect(link).toBeDefined();
-    expect(link.target_slug).toBe('decisions/old-decision');
+    expect(link.target_slug).toBe('20251115000000');
   });
 
   it('extracts superseded_by field as link_type="superseded_by"', () => {
-    const fm = { superseded_by: '[[decisions/new-decision]]' };
+    const fm = { superseded_by: '[[20260301000600]]' };
     const links = extractLinks(SOURCE, fm, '');
     const link = links.find(l => l.link_type === 'superseded_by');
     expect(link).toBeDefined();
-    expect(link.target_slug).toBe('decisions/new-decision');
+    expect(link.target_slug).toBe('20260301000600');
   });
 
   it('extracts related array as link_type="related"', () => {
-    const fm = { related: ['[[notes/note-a]]', '[[notes/note-b]]'] };
+    const fm = { related: ['[[20260101000001]]', '[[20260101000002]]'] };
     const links = extractLinks(SOURCE, fm, '');
     const related = links.filter(l => l.link_type === 'related');
     expect(related).toHaveLength(2);
     const targets = related.map(l => l.target_slug);
-    expect(targets).toContain('notes/note-a');
-    expect(targets).toContain('notes/note-b');
+    expect(targets).toContain('20260101000001');
+    expect(targets).toContain('20260101000002');
   });
 
   it('extracts references array as link_type="references"', () => {
-    const fm = { references: ['[[references/ref-a]]'] };
+    const fm = { references: ['[[20260110000400]]'] };
     const links = extractLinks(SOURCE, fm, '');
     const ref = links.find(l => l.link_type === 'references');
     expect(ref).toBeDefined();
-    expect(ref.target_slug).toBe('references/ref-a');
+    expect(ref.target_slug).toBe('20260110000400');
   });
 
   it('extracts attendees wikilinks as link_type="body" (not a typed field)', () => {
     const fm = {
-      attendees: ['[[people/alice]]', '[[people/bob]]'],
+      attendees: ['[[20250601000100]]', '[[20260110000200]]'],
     };
     const links = extractLinks(SOURCE, fm, '');
     const bodyLinks = links.filter(l => l.link_type === 'body');
     const targets = bodyLinks.map(l => l.target_slug);
-    expect(targets).toContain('people/alice');
-    expect(targets).toContain('people/bob');
+    expect(targets).toContain('20250601000100');
+    expect(targets).toContain('20260110000200');
   });
 
   it('extracts other frontmatter wikilinks as link_type="body"', () => {
-    const fm = { from: '[[people/someone]]' };
+    const fm = { from: '[[20251101000000]]' };
     const links = extractLinks(SOURCE, fm, '');
-    const link = links.find(l => l.target_slug === 'people/someone');
+    const link = links.find(l => l.target_slug === '20251101000000');
     expect(link).toBeDefined();
     expect(link.link_type).toBe('body');
   });
 
   it('extracts body content wikilinks as link_type="body"', () => {
-    const body = 'See [[notes/some-note]] for details and [[projects/xyz]].';
+    const body = 'See [[20260110000300]] for details and [[20260115000100]].';
     const links = extractLinks(SOURCE, {}, body);
     const targets = links.map(l => l.target_slug);
-    expect(targets).toContain('notes/some-note');
-    expect(targets).toContain('projects/xyz');
+    expect(targets).toContain('20260110000300');
+    expect(targets).toContain('20260115000100');
     links.forEach(l => expect(l.link_type).toBe('body'));
   });
 
   it('deduplicates (source, target, link_type) triples', () => {
-    const body = '[[notes/dup]] and [[notes/dup]] again';
+    const body = '[[20260101000001]] and [[20260101000001]] again';
     const links = extractLinks(SOURCE, {}, body);
-    const dup = links.filter(l => l.target_slug === 'notes/dup');
+    const dup = links.filter(l => l.target_slug === '20260101000001');
     expect(dup).toHaveLength(1);
   });
 
   it('does NOT deduplicate across different link_types for same target', () => {
-    const fm = { related: ['[[notes/same]]'] };
-    const body = 'Also see [[notes/same]] in the body.';
+    const fm = { related: ['[[20260101000001]]'] };
+    const body = 'Also see [[20260101000001]] in the body.';
     const links = extractLinks(SOURCE, fm, body);
-    const forSame = links.filter(l => l.target_slug === 'notes/same');
+    const forSame = links.filter(l => l.target_slug === '20260101000001');
     // Should have one 'related' and one 'body'
     expect(forSame.length).toBe(2);
     const types = forSame.map(l => l.link_type);

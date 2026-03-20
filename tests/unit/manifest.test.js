@@ -19,63 +19,66 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function insertNote(slug, fields = {}) {
+function insertNote(id, fields = {}) {
   const {
     type = 'note',
     title = 'Test Note',
-    folder = slug.split('/')[0],
+    folder = 'notes',
     created = '2026-01-01T00:00:00',
     modified = '2026-01-01T00:00:00',
     superseded_by = null,
     supersedes = null,
     metadata = {},
   } = fields;
-  db.upsertNote(slug, { type, title, folder, created, modified, superseded_by, supersedes, metadata });
+  db.upsertNote(id, { type, title, folder, created, modified, superseded_by, supersedes, metadata });
 }
 
 describe('initManifest', () => {
   it('loads non-superseded notes into manifest', () => {
-    insertNote('notes/note-a', { title: 'Note A' });
-    insertNote('notes/note-b', { title: 'Note B' });
+    insertNote('20260101000000', { title: 'Note A', folder: 'notes' });
+    insertNote('20260101000001', { title: 'Note B', folder: 'notes' });
     const manifest = initManifest(db);
-    expect(manifest['notes/note-a']).toBeDefined();
-    expect(manifest['notes/note-b']).toBeDefined();
+    expect(manifest['20260101000000']).toBeDefined();
+    expect(manifest['20260101000001']).toBeDefined();
   });
 
   it('excludes superseded notes from manifest', () => {
-    insertNote('notes/current', { title: 'Current' });
-    insertNote('notes/old', {
+    insertNote('20260101000000', { title: 'Current', folder: 'notes' });
+    insertNote('20260101000001', {
       title: 'Old Note',
-      superseded_by: 'notes/current',
+      folder: 'notes',
+      superseded_by: '20260101000000',
     });
     const manifest = initManifest(db);
-    expect(manifest['notes/current']).toBeDefined();
-    expect(manifest['notes/old']).toBeUndefined();
+    expect(manifest['20260101000000']).toBeDefined();
+    expect(manifest['20260101000001']).toBeUndefined();
   });
 
   it('spreads metadata fields flat onto manifest entry', () => {
-    insertNote('tasks/my-task', {
+    insertNote('20260301000000', {
       type: 'task',
       title: 'My Task',
+      folder: 'tasks',
       metadata: { gtd: 'next', status: 'todo', due: '2026-03-30' },
     });
     const manifest = initManifest(db);
-    const entry = manifest['tasks/my-task'];
+    const entry = manifest['20260301000000'];
     expect(entry.gtd).toBe('next');
     expect(entry.status).toBe('todo');
     expect(entry.due).toBe('2026-03-30');
   });
 
   it('manifest entries have expected shape', () => {
-    insertNote('notes/shaped', {
+    insertNote('20260101000002', {
       type: 'note',
       title: 'Shaped Note',
+      folder: 'notes',
       created: '2026-01-01T09:00:00',
       modified: '2026-01-02T09:00:00',
     });
     const manifest = initManifest(db);
-    const entry = manifest['notes/shaped'];
-    expect(entry.id).toBe('notes/shaped');
+    const entry = manifest['20260101000002'];
+    expect(entry.id).toBe('20260101000002');
     expect(entry.type).toBe('note');
     expect(entry.title).toBe('Shaped Note');
     expect(entry.folder).toBe('notes');
@@ -86,11 +89,12 @@ describe('initManifest', () => {
   });
 
   it('does not include _body in manifest entries', () => {
-    insertNote('notes/no-body', {
+    insertNote('20260101000003', {
+      folder: 'notes',
       metadata: { _body: 'some body content', subtype: 'research' },
     });
     const manifest = initManifest(db);
-    const entry = manifest['notes/no-body'];
+    const entry = manifest['20260101000003'];
     expect(entry._body).toBeUndefined();
     expect(entry.subtype).toBe('research');
   });
@@ -99,7 +103,7 @@ describe('initManifest', () => {
 describe('addToManifest', () => {
   it('adds a new entry to manifest', () => {
     const manifest = {};
-    addToManifest(manifest, 'tasks/new-task', {
+    addToManifest(manifest, '20260301000001', {
       type: 'task',
       title: 'New Task',
       folder: 'tasks',
@@ -109,13 +113,13 @@ describe('addToManifest', () => {
       supersedes: null,
       metadata: { gtd: 'inbox' },
     });
-    expect(manifest['tasks/new-task']).toBeDefined();
-    expect(manifest['tasks/new-task'].gtd).toBe('inbox');
+    expect(manifest['20260301000001']).toBeDefined();
+    expect(manifest['20260301000001'].gtd).toBe('inbox');
   });
 
   it('updates an existing entry', () => {
-    const manifest = { 'tasks/t': { id: 'tasks/t', title: 'Old' } };
-    addToManifest(manifest, 'tasks/t', {
+    const manifest = { '20260301000002': { id: '20260301000002', title: 'Old' } };
+    addToManifest(manifest, '20260301000002', {
       type: 'task',
       title: 'New Title',
       folder: 'tasks',
@@ -123,33 +127,33 @@ describe('addToManifest', () => {
       supersedes: null,
       metadata: {},
     });
-    expect(manifest['tasks/t'].title).toBe('New Title');
+    expect(manifest['20260301000002'].title).toBe('New Title');
   });
 
   it('removes from manifest when superseded_by is set', () => {
-    const manifest = { 'notes/old': { id: 'notes/old', title: 'Old Note' } };
-    addToManifest(manifest, 'notes/old', {
+    const manifest = { '20260101000004': { id: '20260101000004', title: 'Old Note' } };
+    addToManifest(manifest, '20260101000004', {
       type: 'note',
       title: 'Old Note',
       folder: 'notes',
-      superseded_by: 'notes/new',
+      superseded_by: '20260101000005',
       supersedes: null,
       metadata: {},
     });
-    expect(manifest['notes/old']).toBeUndefined();
+    expect(manifest['20260101000004']).toBeUndefined();
   });
 });
 
 describe('removeFromManifest', () => {
   it('removes an existing entry', () => {
-    const manifest = { 'tasks/del': { id: 'tasks/del' } };
-    removeFromManifest(manifest, 'tasks/del');
-    expect(manifest['tasks/del']).toBeUndefined();
+    const manifest = { '20260301000003': { id: '20260301000003' } };
+    removeFromManifest(manifest, '20260301000003');
+    expect(manifest['20260301000003']).toBeUndefined();
   });
 
-  it('is a no-op for non-existent slug', () => {
-    const manifest = { 'tasks/keep': { id: 'tasks/keep' } };
-    removeFromManifest(manifest, 'tasks/ghost');
-    expect(manifest['tasks/keep']).toBeDefined();
+  it('is a no-op for non-existent id', () => {
+    const manifest = { '20260301000004': { id: '20260301000004' } };
+    removeFromManifest(manifest, '99999999999999');
+    expect(manifest['20260301000004']).toBeDefined();
   });
 });

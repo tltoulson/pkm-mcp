@@ -2,13 +2,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { generateFilename } = require('../utils/slugify');
+const { generateId, idToPath, NOTES_DIR } = require('../utils/timestamp');
 const { extractLinks } = require('../utils/links');
 const { addToManifest } = require('../manifest');
 const { nowTimestamp, writeNote } = require('../utils/frontmatter');
 
 /**
- * Maps note type to default folder.
+ * Maps note type to logical folder name.
  */
 const TYPE_TO_FOLDER = {
   task: 'tasks',
@@ -35,12 +35,12 @@ async function captureImpl(args, ctx) {
     title: titleArg,
     metadata = {},
     related_note_ids = [],
-    suggested_folder,
+    suggested_folder,  // accepted but ignored — folder is derived from type
   } = args;
   const { db, manifest, vaultPath } = ctx;
 
-  // Determine folder
-  const folder = suggested_folder || TYPE_TO_FOLDER[suggested_type] || 'notes';
+  // Determine logical folder (from type, not path)
+  const folder = TYPE_TO_FOLDER[suggested_type] || 'notes';
 
   // Determine title
   let title = titleArg;
@@ -49,10 +49,10 @@ async function captureImpl(args, ctx) {
     title = firstLine || 'Untitled';
   }
 
-  // Generate filename and slug
-  const filename = generateFilename(title);
-  const slug = `${folder}/${filename}`;
-  const filepath = path.join(vaultPath, slug + '.md');
+  // Generate timestamp ID; notes live in vaultPath/notes/
+  const id = generateId();
+  const filepath = idToPath(vaultPath, id);
+  fs.mkdirSync(path.join(vaultPath, NOTES_DIR), { recursive: true });
 
   const now = nowTimestamp();
 
@@ -80,14 +80,13 @@ async function captureImpl(args, ctx) {
   }
 
   // Serialize and write (new file, no race condition risk)
-  fs.mkdirSync(path.dirname(filepath), { recursive: true });
   writeNote(filepath, frontmatterData, content);
 
   // Update db
   const { type, title: t, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
   const dbMetadata = { ...rest, aliases: aliases || undefined, _body: content };
 
-  db.upsertNote(slug, {
+  db.upsertNote(id, {
     type: suggested_type,
     title,
     folder,
@@ -98,11 +97,11 @@ async function captureImpl(args, ctx) {
     metadata: dbMetadata,
   });
 
-  const links = extractLinks(slug, frontmatterData, content);
-  db.upsertNoteLinks(slug, links);
+  const links = extractLinks(id, frontmatterData, content);
+  db.upsertNoteLinks(id, links);
 
   // Update manifest
-  addToManifest(manifest, slug, {
+  addToManifest(manifest, id, {
     type: suggested_type,
     title,
     folder,
@@ -118,7 +117,7 @@ async function captureImpl(args, ctx) {
     .filter(id => manifest[id])
     .map(id => ({ id, title: manifest[id]?.title }));
 
-  return { created_note_id: slug, suggested_links };
+  return { created_note_id: id, suggested_links };
 }
 
 /**
@@ -142,9 +141,9 @@ function register(mcpServer, ctx) {
       related_note_ids: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Slugs of related notes to link',
+        description: 'IDs of related notes to link',
       },
-      suggested_folder: { type: 'string', description: 'Override the default folder for this note type' },
+      suggested_folder: { type: 'string', description: 'Accepted for compatibility but ignored — folder is derived from type' },
     },
     async (args) => {
       const result = await captureImpl(args, ctx);
