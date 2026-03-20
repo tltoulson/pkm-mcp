@@ -1,0 +1,11 @@
+---
+type: task
+title: Deploy new CI/CD pipeline to production
+created: '2026-03-10T14:00:00'
+modified: '2026-03-12T10:00:00'
+gtd: done
+status: done
+completed: '2026-03-12T10:00:00'
+project: '[[projects/2026-01-15-platform-modernization]]'
+---
+New pipeline live. Build times reduced from 18min to 4min. Zero incidents on rollout.

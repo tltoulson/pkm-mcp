@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(del \"D:\\\\Code Projects\\\\pkm-mcp\\\\index\\\\topics.py\")",
+      "Bash(where python:*)",
+      "Bash(python -c \"import pydantic; print\\(''pydantic ok''\\)\")",
+      "Bash(py -3.11 -c \"import pydantic; print\\(''pydantic in py launcher''\\)\")",
+      "Read(//c/Users/tltou/AppData/Roaming/**)",
+      "Bash(nssm status:*)",
+      "Bash(pip show:*)",
+      "Bash(pip3 show:*)",
+      "Bash(python -m pip install -r c:Codegitpkm-mcprequirements.txt)",
+      "Bash(python -c \"import pydantic; print\\(''ok''\\)\")",
+      "Bash(npm info:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

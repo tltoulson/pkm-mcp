@@ -1,0 +1,15 @@
+---
+type: project
+title: Platform Modernization
+created: '2026-01-15T09:00:00'
+modified: '2026-03-12T10:00:00'
+status: active
+goal: Migrate all services to new infrastructure stack by end of Q2
+due: '2026-06-30'
+aliases:
+  - Platform Mod
+  - platform-modernization
+related:
+  - '[[decisions/2026-01-14-choose-auth-provider]]'
+---
+Major initiative to modernize the engineering platform. Covers auth migration, CI/CD, monitoring, and API gateway.

@@ -1,0 +1,14 @@
+---
+type: decision
+title: Keep polyrepo structure for platform services
+created: '2026-01-20T11:00:00'
+modified: '2026-01-20T12:00:00'
+project: '[[projects/2026-01-15-platform-modernization]]'
+options:
+  - Migrate to monorepo
+  - Keep polyrepo
+chosen: Keep polyrepo
+confidence: medium
+reversible: true
+---
+Monorepo has advantages but migration cost is too high mid-project. Revisit after platform stabilizes.

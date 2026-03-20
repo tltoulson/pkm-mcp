@@ -1,0 +1,15 @@
+---
+type: note
+title: Engineering Team Norms
+created: '2026-03-01T09:00:00'
+modified: '2026-03-10T11:00:00'
+subtype: procedure
+aliases:
+  - team agreements
+  - working agreements
+---
+Agreed norms for the engineering team.
+
+- Code reviews within 24 hours
+- On-call rotation: weekly, follow the runbook
+- Architecture decisions need an ADR with [[decisions/2026-03-01-api-versioning-strategy]] as an example
