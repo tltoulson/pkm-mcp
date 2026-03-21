@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+tests/
+scripts/
+docs/
+*.md
+!package.json
+.git/
+.gitignore
+.npmrc
+coverage/
+*.log

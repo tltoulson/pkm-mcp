@@ -1,0 +1,19 @@
+services:
+  pkm-mcp:
+    build: .
+    ports:
+      - "${MCP_PORT:-8765}:${MCP_PORT:-8765}"
+    volumes:
+      - ${VAULT_PATH}:/vault
+      - ${INDEX_PATH}:/index
+    environment:
+      VAULT_PATH: /vault
+      INDEX_PATH: /index
+      MCP_PORT: ${MCP_PORT:-8765}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${MCP_PORT:-8765}/mcp', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

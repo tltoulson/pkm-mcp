@@ -64,12 +64,14 @@ async function main() {
     console.log(`PKM MCP server listening on port ${port}`);
   });
 
-  process.on('SIGINT', () => {
+  function shutdown() {
     console.log('\nShutting down...');
     watcher.close();
     db.close();
     process.exit(0);
-  });
+  }
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 main().catch(err => {
