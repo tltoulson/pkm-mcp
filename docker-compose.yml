@@ -10,6 +10,7 @@ services:
       VAULT_PATH: /vault
       INDEX_PATH: /index
       MCP_PORT: ${MCP_PORT:-8765}
+      POLL_INTERVAL: ${POLL_INTERVAL:-2000}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:${MCP_PORT:-8765}/mcp', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]

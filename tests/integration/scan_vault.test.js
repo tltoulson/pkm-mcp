@@ -6,7 +6,6 @@ const path = require('path');
 const os = require('os');
 const { createTestContext, cleanupTestContext, FIXTURE_VAULT } = require('../helpers/setup');
 const { initDb } = require('../../src/db');
-const { initNoteCache } = require('../../src/noteCache');
 
 let ctx;
 
@@ -135,16 +134,14 @@ describe('scanVault', () => {
     expect(link).toBeDefined();
   });
 
-  it('folder field is derived from type, not from path', () => {
-    // 20260115000100 is type=project, so folder should be 'projects'
-    const row = ctx.db.raw.prepare('SELECT folder FROM notes WHERE id = ?').get('20260115000100');
+  it('type field is stored correctly from frontmatter', () => {
+    const row = ctx.db.raw.prepare('SELECT type FROM notes WHERE id = ?').get('20260115000100');
     expect(row).toBeDefined();
-    expect(row.folder).toBe('projects');
+    expect(row.type).toBe('project');
 
-    // 20260301000300 is type=task, so folder should be 'tasks'
-    const taskRow = ctx.db.raw.prepare('SELECT folder FROM notes WHERE id = ?').get('20260301000300');
+    const taskRow = ctx.db.raw.prepare('SELECT type FROM notes WHERE id = ?').get('20260301000300');
     expect(taskRow).toBeDefined();
-    expect(taskRow.folder).toBe('tasks');
+    expect(taskRow.type).toBe('task');
   });
 
   it('IDs are flat 14-digit timestamps (no folder prefix)', () => {

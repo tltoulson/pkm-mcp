@@ -23,14 +23,13 @@ function insertNote(id, fields = {}) {
   const {
     type = 'note',
     title = 'Test Note',
-    folder = 'notes',
     created = '2026-01-01T00:00:00',
     modified = '2026-01-01T00:00:00',
     superseded_by = null,
     supersedes = null,
     metadata = {},
   } = fields;
-  db.upsertNote(id, { type, title, folder, created, modified, superseded_by, supersedes, metadata });
+  db.upsertNote(id, { type, title, created, modified, superseded_by, supersedes, metadata });
 }
 
 describe('initNoteCache', () => {
@@ -46,7 +45,6 @@ describe('initNoteCache', () => {
     insertNote('20260101000000', { title: 'Current', folder: 'notes' });
     insertNote('20260101000001', {
       title: 'Old Note',
-      folder: 'notes',
       superseded_by: '20260101000000',
     });
     const noteCache = initNoteCache(db);
@@ -59,7 +57,6 @@ describe('initNoteCache', () => {
     insertNote('20260301000000', {
       type: 'task',
       title: 'My Task',
-      folder: 'tasks',
       metadata: { gtd: 'next', status: 'todo', due: '2026-03-30' },
     });
     const noteCache = initNoteCache(db);
@@ -73,7 +70,6 @@ describe('initNoteCache', () => {
     insertNote('20260101000002', {
       type: 'note',
       title: 'Shaped Note',
-      folder: 'notes',
       created: '2026-01-01T09:00:00',
       modified: '2026-01-02T09:00:00',
     });
@@ -82,7 +78,6 @@ describe('initNoteCache', () => {
     expect(entry.id).toBe('20260101000002');
     expect(entry.type).toBe('note');
     expect(entry.title).toBe('Shaped Note');
-    expect(entry.folder).toBe('notes');
     expect(entry.created).toBe('2026-01-01T09:00:00');
     expect(entry.modified).toBe('2026-01-02T09:00:00');
     expect(entry.superseded_by).toBeNull();
@@ -91,7 +86,6 @@ describe('initNoteCache', () => {
 
   it('does not include _body in noteCache entries', () => {
     insertNote('20260101000003', {
-      folder: 'notes',
       metadata: { _body: 'some body content', subtype: 'research' },
     });
     const noteCache = initNoteCache(db);
@@ -107,7 +101,6 @@ describe('addToCache', () => {
     addToCache(noteCache, '20260301000001', {
       type: 'task',
       title: 'New Task',
-      folder: 'tasks',
       created: '2026-01-01T00:00:00',
       modified: '2026-01-01T00:00:00',
       superseded_by: null,
@@ -123,7 +116,6 @@ describe('addToCache', () => {
     addToCache(noteCache, '20260301000002', {
       type: 'task',
       title: 'New Title',
-      folder: 'tasks',
       superseded_by: null,
       supersedes: null,
       metadata: {},
@@ -136,7 +128,6 @@ describe('addToCache', () => {
     addToCache(noteCache, '20260101000004', {
       type: 'note',
       title: 'Old Note',
-      folder: 'notes',
       superseded_by: '20260101000005',
       supersedes: null,
       metadata: {},

@@ -37,14 +37,14 @@ describe('captureImpl', () => {
     expect(result.created_note_id).not.toContain('/');
   });
 
-  it('folder field in noteCache is derived from type', async () => {
+  it('type field in noteCache matches suggested_type', async () => {
     const result = await captureImpl(
       { content: 'Body', suggested_type: 'task', title: 'Task Note' },
       ctx
     );
     const entry = ctx.noteCache[result.created_note_id];
     expect(entry).toBeDefined();
-    expect(entry.folder).toBe('tasks');
+    expect(entry.type).toBe('task');
   });
 
   it('sets correct frontmatter fields: type, title, created, modified', async () => {
@@ -114,7 +114,7 @@ describe('captureImpl', () => {
     expect(link.title).toBe('Platform Modernization');
   });
 
-  it('suggested_folder is ignored — folder still derived from type', async () => {
+  it('suggested_folder is ignored — ID is a flat 14-digit timestamp', async () => {
     const result = await captureImpl(
       {
         content: 'Body',
@@ -124,11 +124,8 @@ describe('captureImpl', () => {
       },
       ctx
     );
-    // ID has no folder prefix
     expect(result.created_note_id).toMatch(/^\d{14}$/);
-    // folder in noteCache should still be 'notes' (from type=note)
-    const entry = ctx.noteCache[result.created_note_id];
-    expect(entry.folder).toBe('notes');
+    expect(ctx.noteCache[result.created_note_id].type).toBe('note');
   });
 
   it('derives title from first line of content when title not provided', async () => {
@@ -141,19 +138,19 @@ describe('captureImpl', () => {
     expect(data.title).toBe('My Heading Title');
   });
 
-  it('project type has folder=projects in noteCache', async () => {
+  it('project type is stored correctly in noteCache', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'project', title: 'New Project' },
       ctx
     );
-    expect(ctx.noteCache[result.created_note_id].folder).toBe('projects');
+    expect(ctx.noteCache[result.created_note_id].type).toBe('project');
   });
 
-  it('meeting type has folder=meetings in noteCache', async () => {
+  it('meeting type is stored correctly in noteCache', async () => {
     const result = await captureImpl(
       { content: '', suggested_type: 'meeting', title: 'New Meeting' },
       ctx
     );
-    expect(ctx.noteCache[result.created_note_id].folder).toBe('meetings');
+    expect(ctx.noteCache[result.created_note_id].type).toBe('meeting');
   });
 });
