@@ -87,8 +87,8 @@ function register(mcpServer, ctx) {
     'traverse_index',
     'Traverse an index note and fetch its linked notes (1 or 2 levels deep)',
     {
-      id: { type: 'string', description: 'Slug of the index note to traverse' },
-      depth: { type: 'number', description: 'Traversal depth: 1 (direct links) or 2 (links of links). Default 1.' },
+      id: z.string().describe('ID of the index note to traverse'),
+      depth: z.number().optional().describe('Traversal depth: 1 (direct links) or 2 (links of links). Default 1.'),
     },
     async (args) => {
       const result = await traverseIndexImpl(args, ctx);

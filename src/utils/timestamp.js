@@ -28,6 +28,11 @@ function generateId() {
  */
 function idToPath(vaultPath, id) {
   const path = require('path');
+  // IDs containing '/' are vault-relative paths (e.g. _system/INSTRUCTIONS).
+  // Flat timestamp IDs (14 digits, no slash) live in notes/.
+  if (id.includes('/')) {
+    return path.join(vaultPath, id + '.md');
+  }
   return path.join(vaultPath, 'notes', id + '.md');
 }
 
