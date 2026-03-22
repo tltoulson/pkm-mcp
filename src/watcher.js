@@ -48,7 +48,6 @@ function startWatcher(vaultPath, db, noteCache) {
     const pollStartedAt = new Date();
     try {
       const lastSync = getLastSync();
-      console.log(`watcher: poll start=${pollStartedAt.toISOString()} lastSync=${lastSync.toISOString()}`);
 
       if (!fs.existsSync(notesDir)) {
         console.warn(`watcher: notesDir missing: ${notesDir}`);
@@ -64,8 +63,6 @@ function startWatcher(vaultPath, db, noteCache) {
         return;
       }
 
-      console.log(`watcher: scanned ${filenames.length} files`);
-
       // Identify files modified since last sync
       const changed = [];
       for (const filename of filenames) {
@@ -76,13 +73,8 @@ function startWatcher(vaultPath, db, noteCache) {
         } catch {
           continue;
         }
-        if (stat.mtime > lastSync) {
-          console.log(`watcher: changed ${filename} mtime=${stat.mtime.toISOString()}`);
-          changed.push(filepath);
-        }
+        if (stat.mtime > lastSync) changed.push(filepath);
       }
-
-      console.log(`watcher: ${changed.length} file(s) changed`);
 
       if (changed.length > 0) {
         // Two-pass: insert all changed notes first, then all their links.
@@ -124,7 +116,6 @@ function startWatcher(vaultPath, db, noteCache) {
           try {
             db.upsertNote(id, noteFields);
             parsed.set(id, { frontmatterData, bodyContent, noteFields });
-            console.log(`watcher: pass1 upserted ${id} title="${effectiveTitle}"`);
           } catch (err) {
             console.error(`watcher: failed to upsert note ${id}: ${err.message}`);
           }
@@ -134,10 +125,9 @@ function startWatcher(vaultPath, db, noteCache) {
         for (const [id, { frontmatterData, bodyContent, noteFields }] of parsed) {
           try {
             const links = extractLinks(id, frontmatterData, bodyContent);
-            console.log(`watcher: pass2 links for ${id}: ${links.map(l => `${l.link_type}:${l.target_slug}`).join(', ')}`);
             db.upsertNoteLinks(id, links);
             addToCache(noteCache, id, noteFields);
-            console.log(`watcher: pass2 synced ${id} links=${links.length}`);
+            console.log(`watcher: synced ${id} (${noteFields.title})`);
           } catch (err) {
             console.error(`watcher: failed to sync links for ${id}: ${err.message}`);
           }
@@ -156,7 +146,6 @@ function startWatcher(vaultPath, db, noteCache) {
       }
 
       setLastSync(pollStartedAt);
-      console.log(`watcher: poll done, next lastSync=${pollStartedAt.toISOString()}`);
     } catch (err) {
       console.error(`watcher: uncaught poll error: ${err.message}`, err.stack);
     }

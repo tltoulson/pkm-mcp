@@ -53,8 +53,10 @@ function initDb(indexPath) {
   const dbPath = path.join(indexPath, 'vault.db');
   const raw = new Database(dbPath);
 
-  // WAL mode for concurrent reads and safe writes
-  raw.pragma('journal_mode = WAL');
+  // DELETE journal mode: writes commit directly to the main file.
+  // WAL would require vault.db-shm (shared memory) coordination which breaks
+  // when reading via Samba — the Windows client can't participate in WAL sync.
+  raw.pragma('journal_mode = DELETE');
   raw.pragma('synchronous = NORMAL');
 
   // System table survives rebuilds
