@@ -101,10 +101,12 @@ function normalizeWikilink(raw) {
   if (typeof raw !== 'string') return '';
   // Strip surrounding quotes first (YAML may have wrapped the value in quotes)
   // Then strip wikilink brackets [[ and ]]
+  // Then strip Obsidian display text: [[ID|Display Name]] → ID
   return raw
     .replace(/^['"]|['"]$/g, '') // strip surrounding quotes
     .replace(/^\[\[/, '')        // strip leading [[
     .replace(/\]\]$/, '')        // strip trailing ]]
+    .replace(/\|.*$/, '')        // strip |display text (Obsidian alias syntax)
     .trim();
 }
 

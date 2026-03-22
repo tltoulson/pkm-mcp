@@ -9,22 +9,7 @@ const { extractLinks } = require('./utils/links');
 /**
  * Schema version. Increment this to force a vault rebuild on schema changes.
  */
-const CURRENT_SCHEMA_VERSION = '1';
-
-/**
- * Maps note type to logical folder name.
- */
-const TYPE_TO_FOLDER = {
-  task: 'tasks',
-  project: 'projects',
-  journal: 'journal',
-  note: 'notes',
-  person: 'people',
-  meeting: 'meetings',
-  decision: 'decisions',
-  reference: 'references',
-  index: 'indexes',
-};
+const CURRENT_SCHEMA_VERSION = '2';
 
 /**
  * SQL for vault tables (dropped and recreated on schema version mismatch).
@@ -34,7 +19,6 @@ const VAULT_TABLE_SQL = `
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
     title TEXT NOT NULL,
-    folder TEXT NOT NULL,
     created TEXT,
     modified TEXT,
     superseded_by TEXT,
@@ -104,8 +88,8 @@ function initDb(indexPath) {
   // Prepared statements (defined once for performance)
   const stmts = {
     upsertNote: raw.prepare(`
-      INSERT OR REPLACE INTO notes (id, type, title, folder, created, modified, superseded_by, supersedes, metadata)
-      VALUES (@id, @type, @title, @folder, @created, @modified, @superseded_by, @supersedes, @metadata)
+      INSERT OR REPLACE INTO notes (id, type, title, created, modified, superseded_by, supersedes, metadata)
+      VALUES (@id, @type, @title, @created, @modified, @superseded_by, @supersedes, @metadata)
     `),
     deleteFts: raw.prepare('DELETE FROM notes_fts WHERE note_id = ?'),
     insertFts: raw.prepare('INSERT INTO notes_fts (note_id, title, aliases, content) VALUES (?, ?, ?, ?)'),
@@ -134,13 +118,12 @@ function initDb(indexPath) {
    * @param {string} id
    * @param {object} fields
    */
-  function upsertNote(id, { type, title, folder, created, modified, superseded_by, supersedes, metadata }) {
+  function upsertNote(id, { type, title, created, modified, superseded_by, supersedes, metadata }) {
     raw.transaction(() => {
       stmts.upsertNote.run({
         id,
         type: type || 'note',
         title: title || id,
-        folder: folder || TYPE_TO_FOLDER[type] || 'notes',
         created: created || null,
         modified: modified || null,
         superseded_by: superseded_by || null,
@@ -293,7 +276,6 @@ function initDb(indexPath) {
         }
 
         const type = frontmatterData.type || 'note';
-        const folder = TYPE_TO_FOLDER[type] || 'notes';
 
         // Extract universal fields; everything else goes into metadata
         const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
@@ -304,7 +286,6 @@ function initDb(indexPath) {
         upsertNote(id, {
           type,
           title: title || id,
-          folder,
           created: created || null,
           modified: modified || null,
           superseded_by: superseded_by || null,

@@ -10,18 +10,6 @@ const { nowTimestamp, writeNote } = require('../utils/frontmatter');
 /**
  * Maps note type to logical folder name.
  */
-const TYPE_TO_FOLDER = {
-  task: 'tasks',
-  project: 'projects',
-  journal: 'journal',
-  note: 'notes',
-  person: 'people',
-  meeting: 'meetings',
-  decision: 'decisions',
-  reference: 'references',
-  index: 'indexes',
-};
-
 /**
  * Capture a new note in the vault.
  * @param {object} args
@@ -35,12 +23,9 @@ async function captureImpl(args, ctx) {
     title: titleArg,
     metadata = {},
     related_note_ids = [],
-    suggested_folder,  // accepted but ignored — folder is derived from type
+    suggested_folder,  // accepted but ignored
   } = args;
   const { db, noteCache, vaultPath } = ctx;
-
-  // Determine logical folder (from type, not path)
-  const folder = TYPE_TO_FOLDER[suggested_type] || 'notes';
 
   // Determine title
   let title = titleArg;
@@ -89,7 +74,6 @@ async function captureImpl(args, ctx) {
   db.upsertNote(id, {
     type: suggested_type,
     title,
-    folder,
     created: now,
     modified: now,
     superseded_by: null,
@@ -104,7 +88,6 @@ async function captureImpl(args, ctx) {
   addToCache(noteCache, id, {
     type: suggested_type,
     title,
-    folder,
     created: now,
     modified: now,
     superseded_by: null,

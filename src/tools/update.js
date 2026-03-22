@@ -6,12 +6,6 @@ const { extractLinks } = require('../utils/links');
 const { addToCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
 
-const TYPE_TO_FOLDER = {
-  task: 'tasks', project: 'projects', journal: 'journal',
-  note: 'notes', person: 'people', meeting: 'meetings',
-  decision: 'decisions', reference: 'references', index: 'indexes',
-};
-
 /**
  * Update an existing note: patch frontmatter fields, optionally replace body.
  * Uses atomic write (tmp + rename) to avoid corruption if Obsidian has file open.
@@ -63,7 +57,6 @@ async function updateImpl(args, ctx) {
   db.upsertNote(id, {
     type: data.type || 'note',
     title: data.title || id,
-    folder: TYPE_TO_FOLDER[data.type] || 'notes',
     created: data.created || null,
     modified: data.modified,
     superseded_by: data.superseded_by || null,
@@ -78,7 +71,6 @@ async function updateImpl(args, ctx) {
   addToCache(noteCache, id, {
     type: data.type || 'note',
     title: data.title || id,
-    folder: TYPE_TO_FOLDER[data.type] || 'notes',
     created: data.created || null,
     modified: data.modified,
     superseded_by: data.superseded_by || null,

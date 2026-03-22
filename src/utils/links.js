@@ -87,10 +87,15 @@ function extractLinks(slug, frontmatterData, bodyContent) {
   }
 
   // Body content: scan for [[...]] patterns → link_type = 'body'
+  // Strip code blocks and inline code first to avoid picking up wikilink-shaped
+  // text in code examples (e.g. [[slug]], [[{old_id}]] in schema/spec notes).
   if (bodyContent && typeof bodyContent === 'string') {
+    const stripped = bodyContent
+      .replace(/```[\s\S]*?```/g, '')  // fenced code blocks
+      .replace(/`[^`\n]+`/g, '');      // inline code spans
     const re = /\[\[([^\]]+)\]\]/g;
     let m;
-    while ((m = re.exec(bodyContent)) !== null) {
+    while ((m = re.exec(stripped)) !== null) {
       const normalized = normalizeWikilink(m[0]);
       if (normalized) addLink(normalized, 'body');
     }
