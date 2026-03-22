@@ -134,6 +134,7 @@ function startWatcher(vaultPath, db, noteCache) {
         for (const [id, { frontmatterData, bodyContent, noteFields }] of parsed) {
           try {
             const links = extractLinks(id, frontmatterData, bodyContent);
+            console.log(`watcher: pass2 links for ${id}: ${links.map(l => `${l.link_type}:${l.target_slug}`).join(', ')}`);
             db.upsertNoteLinks(id, links);
             addToCache(noteCache, id, noteFields);
             console.log(`watcher: pass2 synced ${id} links=${links.length}`);
