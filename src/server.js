@@ -49,7 +49,7 @@ async function main() {
   app.post('/mcp', async (req, res) => {
     const server = makeServer();
     try {
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
       res.on('close', () => { transport.close(); server.close(); });
@@ -64,7 +64,7 @@ async function main() {
   app.get('/mcp', async (req, res) => {
     const server = makeServer();
     try {
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       await server.connect(transport);
       await transport.handleRequest(req, res);
       res.on('close', () => { transport.close(); server.close(); });
