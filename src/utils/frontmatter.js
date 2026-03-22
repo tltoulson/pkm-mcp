@@ -62,7 +62,17 @@ function writeNote(filepath, data, content) {
   // Atomic write: write to tmp then rename
   const tmpPath = path.join(os.tmpdir(), `pkm-tmp-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
   fs.writeFileSync(tmpPath, serialized, 'utf8');
-  fs.renameSync(tmpPath, filepath);
+  try {
+    fs.renameSync(tmpPath, filepath);
+  } catch (err) {
+    if (err.code === 'EXDEV') {
+      // Cross-device rename (e.g. /tmp → /vault on different mounts); fall back to copy+delete
+      fs.copyFileSync(tmpPath, filepath);
+      fs.unlinkSync(tmpPath);
+    } else {
+      throw err;
+    }
+  }
 }
 
 /**
