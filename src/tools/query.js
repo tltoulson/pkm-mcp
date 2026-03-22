@@ -1,5 +1,7 @@
 'use strict';
 
+const { z } = require('zod');
+
 /**
  * Query the PKM vault.
  * Combines noteCache-based where filters, FTS search, link-based filtering,
@@ -185,38 +187,23 @@ function register(mcpServer, ctx) {
     'Supports extended where operators (in, not_in, ne, contains, not_contains, starts_with, ends_with, before/after date ranges, "today" sentinel). ' +
     'Use `include` to co-fetch related note sets for each result in one call.',
     {
-      where: {
-        type: 'object',
-        description:
-          'Filter on frontmatter fields. Values can be: scalar (equality), "today", ' +
-          '{before, after} (date range), {in: []}, {not_in: []}, {ne: value}, ' +
-          '{contains: str}, {not_contains: str}, {starts_with: str}, {ends_with: str}.',
-      },
-      search: { type: 'string', description: 'Full-text search query (FTS5 syntax, supports OR/NOT/phrases)' },
-      linked: {
-        type: 'object',
-        description: 'Structural link filter: { id: slug, direction: "to"|"from"|"any" }',
-      },
-      include: {
-        type: 'object',
-        description:
-          'Traversal: co-fetch related notes for each result. ' +
-          'Keys become result properties under _included. ' +
-          'Each spec: { linked: { direction: "to"|"from"|"any" }, where?: {...} }. ' +
-          'Example: { open_tasks: { linked: { direction: "from" }, where: { type: "task", status: { ne: "done" } } } }',
-      },
-      result_format: {
-        description: '"default" (note cache fields), "full" (include body), "count", or array of field names',
-      },
-      sort: {
-        type: 'object',
-        description: '{ field: string, order: "asc"|"desc" }',
-      },
-      limit: { type: 'number', description: 'Max results (default 25)' },
-      include_superseded: {
-        type: 'boolean',
-        description: 'Include superseded notes in results (default false). Use when querying history or a specific superseded note.',
-      },
+      where: z.record(z.string(), z.unknown()).optional().describe(
+        'Filter on frontmatter fields. Values can be: scalar (equality), "today", ' +
+        '{before, after} (date range), {in: []}, {not_in: []}, {ne: value}, ' +
+        '{contains: str}, {not_contains: str}, {starts_with: str}, {ends_with: str}.'
+      ),
+      search: z.string().optional().describe('Full-text search query (FTS5 syntax, supports OR/NOT/phrases)'),
+      linked: z.record(z.string(), z.unknown()).optional().describe('Structural link filter: { id: slug, direction: "to"|"from"|"any" }'),
+      include: z.record(z.string(), z.unknown()).optional().describe(
+        'Traversal: co-fetch related notes for each result. ' +
+        'Keys become result properties under _included. ' +
+        'Each spec: { linked: { direction: "to"|"from"|"any" }, where?: {...} }. ' +
+        'Example: { open_tasks: { linked: { direction: "from" }, where: { type: "task", status: { ne: "done" } } } }'
+      ),
+      result_format: z.union([z.string(), z.array(z.string())]).optional().describe('"default" (note cache fields), "full" (include body), "count", or array of field names'),
+      sort: z.record(z.string(), z.unknown()).optional().describe('{ field: string, order: "asc"|"desc" }'),
+      limit: z.number().optional().describe('Max results (default 25)'),
+      include_superseded: z.boolean().optional().describe('Include superseded notes in results (default false). Use when querying history or a specific superseded note.'),
     },
     async (args) => {
       const result = await queryImpl(args, ctx);

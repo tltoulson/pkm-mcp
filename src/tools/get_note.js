@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const { readNote } = require('../utils/frontmatter');
 const { idToPath } = require('../utils/timestamp');
 
@@ -28,7 +29,7 @@ function register(mcpServer, ctx) {
     'get_note',
     'Get the full content and frontmatter of a note by slug (works for superseded notes too)',
     {
-      id: { type: 'string', description: 'Slug of the note (e.g. "tasks/2026-03-19-my-task")' },
+      id: z.string().describe('ID of the note to retrieve'),
     },
     async (args) => {
       const result = await getNoteImpl(args, ctx);

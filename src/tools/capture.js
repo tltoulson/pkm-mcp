@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const fs = require('fs');
 const path = require('path');
 const { generateId, idToPath, NOTES_DIR } = require('../utils/timestamp');
@@ -113,20 +114,12 @@ function register(mcpServer, ctx) {
     'capture',
     'Capture a new note, task, project, meeting, decision, or other item in the PKM vault',
     {
-      content: { type: 'string', description: 'Body content of the note (markdown)' },
-      suggested_type: {
-        type: 'string',
-        enum: ['task', 'project', 'note', 'journal', 'person', 'meeting', 'decision', 'reference', 'index'],
-        description: 'Type of note to create',
-      },
-      title: { type: 'string', description: 'Title of the note (derived from content if omitted)' },
-      metadata: { type: 'object', description: 'Additional frontmatter fields' },
-      related_note_ids: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'IDs of related notes to link',
-      },
-      suggested_folder: { type: 'string', description: 'Accepted for compatibility but ignored — folder is derived from type' },
+      content: z.string().optional().describe('Body content of the note (markdown)'),
+      suggested_type: z.enum(['task', 'project', 'note', 'journal', 'person', 'meeting', 'decision', 'reference', 'index']).optional().describe('Type of note to create'),
+      title: z.string().optional().describe('Title of the note (derived from content if omitted)'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Additional frontmatter fields'),
+      related_note_ids: z.array(z.string()).optional().describe('IDs of related notes to link'),
+      suggested_folder: z.string().optional().describe('Accepted for compatibility but ignored — folder is derived from type'),
     },
     async (args) => {
       const result = await captureImpl(args, ctx);

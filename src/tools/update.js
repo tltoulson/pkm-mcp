@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const fs = require('fs');
 const { readNote, writeNote, nowTimestamp } = require('../utils/frontmatter');
 const { extractLinks } = require('../utils/links');
@@ -89,10 +90,10 @@ function register(mcpServer, ctx) {
     'update_note',
     'Update frontmatter fields and/or body content of an existing note',
     {
-      id: { type: 'string', description: 'Slug of the note to update (e.g. "tasks/2026-03-19-my-task")' },
-      content: { type: 'string', description: 'New body content (omit to keep existing)' },
-      title: { type: 'string', description: 'New title (omit to keep existing)' },
-      metadata: { type: 'object', description: 'Frontmatter fields to patch (merged, not replaced)' },
+      id: z.string().describe('ID of the note to update'),
+      content: z.string().optional().describe('New body content (omit to keep existing)'),
+      title: z.string().optional().describe('New title (omit to keep existing)'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Frontmatter fields to patch (merged, not replaced)'),
     },
     async (args) => {
       const result = await updateImpl(args, ctx);

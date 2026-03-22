@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const { getNoteImpl } = require('./get_note');
 const { extractWikilinks } = require('../utils/frontmatter');
 

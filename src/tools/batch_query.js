@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const { queryImpl } = require('./query');
 
 /**
@@ -40,13 +41,11 @@ function register(mcpServer, ctx) {
     'Each query spec accepts the same arguments as `query`. ' +
     'Individual query failures return { error } without aborting others.',
     {
-      queries: {
-        type: 'object',
-        description:
-          'Named query specs. Each key becomes a key in the response. ' +
-          'Example: { overdue: { where: { type: "task", due: { before: "today" } } }, ' +
-          'inbox_count: { where: { gtd: "inbox" }, result_format: "count" } }',
-      },
+      queries: z.record(z.string(), z.unknown()).describe(
+        'Named query specs. Each key becomes a key in the response. ' +
+        'Example: { overdue: { where: { type: "task", due: { before: "today" } } }, ' +
+        'inbox_count: { where: { gtd: "inbox" }, result_format: "count" } }'
+      ),
     },
     async (args) => {
       const result = await batchQueryImpl(args, ctx);

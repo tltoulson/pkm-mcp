@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const fs = require('fs');
 const { removeFromCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
@@ -46,8 +47,8 @@ function register(mcpServer, ctx) {
     'delete_note',
     'Permanently delete a note from the vault (requires confirm_id to match id)',
     {
-      id: { type: 'string', description: 'Slug of the note to delete' },
-      confirm_id: { type: 'string', description: 'Must equal id to confirm deletion' },
+      id: z.string().describe('ID of the note to delete'),
+      confirm_id: z.string().describe('Must equal id to confirm deletion'),
     },
     async (args) => {
       const result = await deleteImpl(args, ctx);

@@ -1,5 +1,6 @@
 'use strict';
 
+const { z } = require('zod');
 const { updateImpl } = require('./update');
 
 /**
@@ -36,11 +37,7 @@ function register(mcpServer, ctx) {
     'batch_update',
     'Update multiple notes in one operation. Individual failures do not abort others.',
     {
-      operations: {
-        type: 'array',
-        description: 'Array of update operations, each with { id, title?, metadata?, content? }',
-        items: { type: 'object' },
-      },
+      operations: z.array(z.record(z.string(), z.unknown())).describe('Array of update operations, each with { id, title?, metadata?, content? }'),
     },
     async (args) => {
       const result = await batchUpdateImpl(args, ctx);
