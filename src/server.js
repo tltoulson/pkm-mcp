@@ -32,29 +32,47 @@ async function main() {
 
   const ctx = { db, noteCache, vaultPath };
 
-  // Create single McpServer instance with all tools registered
-  const mcpServer = new McpServer({
-    name: 'pkm-mcp',
-    version: '1.0.0',
-  });
-
-  registerAll(mcpServer, ctx);
-
   const app = express();
   app.use(express.json());
 
+  // Stateless StreamableHTTP: new McpServer + transport per request.
+  // The SDK does not allow one McpServer instance to connect to multiple
+  // transports — sharing one crashes the process on the second request.
+  // See: node_modules/@modelcontextprotocol/sdk/.../simpleStatelessStreamableHttp.js
+  function makeServer() {
+    const s = new McpServer({ name: 'pkm-mcp', version: '1.0.0' });
+    registerAll(s, ctx);
+    return s;
+  }
+
   // POST /mcp — main MCP endpoint (stateless StreamableHTTP)
   app.post('/mcp', async (req, res) => {
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    await mcpServer.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    const server = makeServer();
+    try {
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+      res.on('close', () => { transport.close(); server.close(); });
+    } catch (err) {
+      console.error('POST /mcp error:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+      server.close();
+    }
   });
 
   // GET /mcp — SSE stream (for MCP SSE clients)
   app.get('/mcp', async (req, res) => {
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    await mcpServer.connect(transport);
-    await transport.handleRequest(req, res);
+    const server = makeServer();
+    try {
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      await server.connect(transport);
+      await transport.handleRequest(req, res);
+      res.on('close', () => { transport.close(); server.close(); });
+    } catch (err) {
+      console.error('GET /mcp error:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+      server.close();
+    }
   });
 
   // DELETE /mcp — not supported

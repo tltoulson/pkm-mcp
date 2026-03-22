@@ -46,104 +46,119 @@ function startWatcher(vaultPath, db, noteCache) {
 
   function poll() {
     const pollStartedAt = new Date();
-    const lastSync = getLastSync();
-
-    if (!fs.existsSync(notesDir)) {
-      setLastSync(pollStartedAt);
-      return;
-    }
-
-    let filenames;
     try {
-      filenames = fs.readdirSync(notesDir).filter(f => f.endsWith('.md') && !f.startsWith('.'));
-    } catch (err) {
-      console.error(`watcher: failed to read notes dir: ${err.message}`);
-      return;
-    }
+      const lastSync = getLastSync();
+      console.log(`watcher: poll start=${pollStartedAt.toISOString()} lastSync=${lastSync.toISOString()}`);
 
-    // Identify files modified since last sync
-    const changed = [];
-    for (const filename of filenames) {
-      const filepath = path.join(notesDir, filename);
-      let stat;
-      try {
-        stat = fs.statSync(filepath);
-      } catch {
-        continue;
+      if (!fs.existsSync(notesDir)) {
+        console.warn(`watcher: notesDir missing: ${notesDir}`);
+        setLastSync(pollStartedAt);
+        return;
       }
-      if (stat.mtime > lastSync) changed.push(filepath);
-    }
 
-    if (changed.length > 0) {
-      // Two-pass: insert all changed notes first, then all their links.
-      // Ensures link targets exist before resolution — handles bulk catch-up
-      // after downtime where multiple new notes may link to each other.
-      const parsed = new Map();
+      let filenames;
+      try {
+        filenames = fs.readdirSync(notesDir).filter(f => f.endsWith('.md') && !f.startsWith('.'));
+      } catch (err) {
+        console.error(`watcher: failed to read notes dir: ${err.message}`);
+        return;
+      }
 
-      // Pass 1: upsert notes
-      for (const filepath of changed) {
-        const id = pathToId(filepath);
-        let frontmatterData = {};
-        let bodyContent = '';
+      console.log(`watcher: scanned ${filenames.length} files`);
 
+      // Identify files modified since last sync
+      const changed = [];
+      for (const filename of filenames) {
+        const filepath = path.join(notesDir, filename);
+        let stat;
         try {
-          const raw = fs.readFileSync(filepath, 'utf8');
-          const p = matter(raw);
-          frontmatterData = p.data || {};
-          bodyContent = p.content || '';
-        } catch (err) {
-          console.warn(`watcher: failed to parse ${filepath}: ${err.message}`);
+          stat = fs.statSync(filepath);
+        } catch {
           continue;
         }
-
-        const type = frontmatterData.type || 'note';
-        const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
-        const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
-        const effectiveTitle = title || firstAlias || id;
-        const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
-        const noteFields = {
-          type,
-          title: effectiveTitle,
-          created: created || null,
-          modified: modified || null,
-          superseded_by: superseded_by || null,
-          supersedes: supersedes || null,
-          metadata,
-        };
-
-        try {
-          db.upsertNote(id, noteFields);
-          parsed.set(id, { frontmatterData, bodyContent, noteFields });
-        } catch (err) {
-          console.error(`watcher: failed to upsert note ${id}: ${err.message}`);
+        if (stat.mtime > lastSync) {
+          console.log(`watcher: changed ${filename} mtime=${stat.mtime.toISOString()}`);
+          changed.push(filepath);
         }
       }
 
-      // Pass 2: upsert links + update noteCache
-      for (const [id, { frontmatterData, bodyContent, noteFields }] of parsed) {
-        try {
-          const links = extractLinks(id, frontmatterData, bodyContent);
-          db.upsertNoteLinks(id, links);
-          addToCache(noteCache, id, noteFields);
-          console.log(`watcher: synced ${id} (${noteFields.title})`);
-        } catch (err) {
-          console.error(`watcher: failed to sync links for ${id}: ${err.message}`);
+      console.log(`watcher: ${changed.length} file(s) changed`);
+
+      if (changed.length > 0) {
+        // Two-pass: insert all changed notes first, then all their links.
+        // Ensures link targets exist before resolution — handles bulk catch-up
+        // after downtime where multiple new notes may link to each other.
+        const parsed = new Map();
+
+        // Pass 1: upsert notes
+        for (const filepath of changed) {
+          const id = pathToId(filepath);
+          let frontmatterData = {};
+          let bodyContent = '';
+
+          try {
+            const raw = fs.readFileSync(filepath, 'utf8');
+            const p = matter(raw);
+            frontmatterData = p.data || {};
+            bodyContent = p.content || '';
+          } catch (err) {
+            console.warn(`watcher: failed to parse ${filepath}: ${err.message}`);
+            continue;
+          }
+
+          const type = frontmatterData.type || 'note';
+          const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+          const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
+          const effectiveTitle = title || firstAlias || id;
+          const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
+          const noteFields = {
+            type,
+            title: effectiveTitle,
+            created: created || null,
+            modified: modified || null,
+            superseded_by: superseded_by || null,
+            supersedes: supersedes || null,
+            metadata,
+          };
+
+          try {
+            db.upsertNote(id, noteFields);
+            parsed.set(id, { frontmatterData, bodyContent, noteFields });
+            console.log(`watcher: pass1 upserted ${id} title="${effectiveTitle}"`);
+          } catch (err) {
+            console.error(`watcher: failed to upsert note ${id}: ${err.message}`);
+          }
+        }
+
+        // Pass 2: upsert links + update noteCache
+        for (const [id, { frontmatterData, bodyContent, noteFields }] of parsed) {
+          try {
+            const links = extractLinks(id, frontmatterData, bodyContent);
+            db.upsertNoteLinks(id, links);
+            addToCache(noteCache, id, noteFields);
+            console.log(`watcher: pass2 synced ${id} links=${links.length}`);
+          } catch (err) {
+            console.error(`watcher: failed to sync links for ${id}: ${err.message}`);
+          }
         }
       }
-    }
 
-    // Deletions: notes in DB with no corresponding file
-    const fileIds = new Set(filenames.map(f => path.basename(f, '.md')));
-    const dbIds = db.raw.prepare('SELECT id FROM notes').all().map(r => r.id);
-    for (const id of dbIds) {
-      if (!fileIds.has(id)) {
-        db.deleteNote(id);
-        removeFromCache(noteCache, id);
-        console.log(`watcher: deleted ${id}`);
+      // Deletions: notes in DB with no corresponding file
+      const fileIds = new Set(filenames.map(f => path.basename(f, '.md')));
+      const dbIds = db.raw.prepare('SELECT id FROM notes').all().map(r => r.id);
+      for (const id of dbIds) {
+        if (!fileIds.has(id)) {
+          db.deleteNote(id);
+          removeFromCache(noteCache, id);
+          console.log(`watcher: deleted ${id}`);
+        }
       }
-    }
 
-    setLastSync(pollStartedAt);
+      setLastSync(pollStartedAt);
+      console.log(`watcher: poll done, next lastSync=${pollStartedAt.toISOString()}`);
+    } catch (err) {
+      console.error(`watcher: uncaught poll error: ${err.message}`, err.stack);
+    }
   }
 
   // Run immediately — catches any changes that occurred during downtime
