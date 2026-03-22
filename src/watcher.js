@@ -8,20 +8,6 @@ const { extractLinks } = require('./utils/links');
 const { addToCache, removeFromCache } = require('./noteCache');
 const { pathToId } = require('./utils/timestamp');
 
-/**
- * Maps note type to logical folder name.
- */
-const TYPE_TO_FOLDER = {
-  task: 'tasks',
-  project: 'projects',
-  journal: 'journal',
-  note: 'notes',
-  person: 'people',
-  meeting: 'meetings',
-  decision: 'decisions',
-  reference: 'references',
-  index: 'indexes',
-};
 
 /**
  * Start a chokidar file watcher on the vault directory.
@@ -68,34 +54,30 @@ function startWatcher(vaultPath, db, noteCache) {
     }
 
     const type = frontmatterData.type || 'note';
-    const folder = TYPE_TO_FOLDER[type] || 'notes';
     const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+    const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
+    const effectiveTitle = title || firstAlias || id;
     const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
 
-    db.upsertNote(id, {
+    const noteFields = {
       type,
-      title: title || id,
-      folder,
+      title: effectiveTitle,
       created: created || null,
       modified: modified || null,
       superseded_by: superseded_by || null,
       supersedes: supersedes || null,
       metadata,
-    });
+    };
 
-    const links = extractLinks(id, frontmatterData, bodyContent);
-    db.upsertNoteLinks(id, links);
-
-    addToCache(noteCache, id, {
-      type,
-      title: title || id,
-      folder,
-      created: created || null,
-      modified: modified || null,
-      superseded_by: superseded_by || null,
-      supersedes: supersedes || null,
-      metadata,
-    });
+    try {
+      db.upsertNote(id, noteFields);
+      const links = extractLinks(id, frontmatterData, bodyContent);
+      db.upsertNoteLinks(id, links);
+      addToCache(noteCache, id, noteFields);
+      console.log(`watcher: updated ${id} (${effectiveTitle})`);
+    } catch (err) {
+      console.error(`watcher: failed to update ${id}: ${err.message}`);
+    }
   }
 
   /**

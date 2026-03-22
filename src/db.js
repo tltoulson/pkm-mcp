@@ -283,9 +283,10 @@ function initDb(indexPath) {
         // Store body in metadata._body for FTS indexing
         const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
 
+        const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
         upsertNote(id, {
           type,
-          title: title || id,
+          title: title || firstAlias || id,
           created: created || null,
           modified: modified || null,
           superseded_by: superseded_by || null,
