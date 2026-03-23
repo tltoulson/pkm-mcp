@@ -9,6 +9,7 @@ const { register: registerGetNote }         = require('./get_note');
 const { register: registerProcessInboxPrep }= require('./process_inbox_prep');
 const { register: registerBatchUpdate }     = require('./batch_update');
 const { register: registerTraverseIndex }   = require('./traverse_index');
+const { register: registerGetVaultContext } = require('./get_vault_context');
 
 /**
  * Register all tools with the MCP server.
@@ -16,6 +17,7 @@ const { register: registerTraverseIndex }   = require('./traverse_index');
  * @param {object} ctx - { db, noteCache, vaultPath }
  */
 function registerAll(mcpServer, ctx) {
+  registerGetVaultContext(mcpServer, ctx);
   registerCapture(mcpServer, ctx);
   registerUpdate(mcpServer, ctx);
   registerDelete(mcpServer, ctx);

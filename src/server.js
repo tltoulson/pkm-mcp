@@ -40,7 +40,11 @@ async function main() {
   // transports — sharing one crashes the process on the second request.
   // See: node_modules/@modelcontextprotocol/sdk/.../simpleStatelessStreamableHttp.js
   function makeServer() {
-    const s = new McpServer({ name: 'pkm-mcp', version: '1.0.0' });
+    const s = new McpServer({
+      name: 'pkm-mcp',
+      version: '1.0.0',
+      instructions: 'Before any vault operations, call get_vault_context. It will return your operating instructions or guide you through initial vault setup if this vault is not yet configured.',
+    });
     registerAll(s, ctx);
     return s;
   }

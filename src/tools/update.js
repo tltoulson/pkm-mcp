@@ -6,6 +6,7 @@ const { readNote, writeNote, nowTimestamp } = require('../utils/frontmatter');
 const { extractLinks } = require('../utils/links');
 const { addToCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
+const { validateType } = require('../utils/sentinel');
 
 /**
  * Update an existing note: patch frontmatter fields, optionally replace body.
@@ -25,6 +26,11 @@ async function updateImpl(args, ctx) {
   }
 
   const { data, content: existingContent } = readNote(filepath);
+
+  // Reject unknown sentinel types if type is being changed
+  if (metadata && metadata.type !== undefined) {
+    validateType(metadata.type);
+  }
 
   // Apply patches to frontmatter
   if (title !== undefined) {

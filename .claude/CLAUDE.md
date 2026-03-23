@@ -9,10 +9,9 @@ Read this file before making any significant decisions:
 
   docs/architecture.md
 
-Also read these vault system files — they define requirements, not suggestions:
-
-  C:\Users\tltou\OneDrive\claud-vault\_system\data-dictionary.md
-  C:\Users\tltou\OneDrive\claud-vault\_system\types\registry.md
+Also read the vault system notes — they define requirements, not suggestions.
+Query the active vault for `{ type: "$system" }` to find them, or call
+`get_vault_context` which returns the root INSTRUCTIONS note automatically.
 
 ## Constraints That Must Not Be Violated
 

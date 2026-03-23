@@ -7,6 +7,7 @@ const { generateId, idToPath, NOTES_DIR } = require('../utils/timestamp');
 const { extractLinks } = require('../utils/links');
 const { addToCache } = require('../noteCache');
 const { nowTimestamp, writeNote } = require('../utils/frontmatter');
+const { validateType } = require('../utils/sentinel');
 
 /**
  * Maps note type to logical folder name.
@@ -27,6 +28,9 @@ async function captureImpl(args, ctx) {
     suggested_folder,  // accepted but ignored
   } = args;
   const { db, noteCache, vaultPath } = ctx;
+
+  // Reject unknown sentinel types (e.g. $typo)
+  validateType(suggested_type);
 
   // Determine title
   let title = titleArg;
@@ -115,7 +119,7 @@ function register(mcpServer, ctx) {
     'Capture a new note, task, project, meeting, decision, or other item in the PKM vault',
     {
       content: z.string().optional().describe('Body content of the note (markdown)'),
-      suggested_type: z.enum(['task', 'project', 'note', 'journal', 'person', 'meeting', 'decision', 'reference', 'index']).optional().describe('Type of note to create'),
+      suggested_type: z.string().optional().describe('Type of note to create. Regular types: task, project, note, journal, person, meeting, decision, reference, index. Sentinel types (reserved): $system. Unknown $-prefixed types are rejected.'),
       title: z.string().optional().describe('Title of the note (derived from content if omitted)'),
       metadata: z.record(z.string(), z.unknown()).optional().describe('Additional frontmatter fields'),
       related_note_ids: z.array(z.string()).optional().describe('IDs of related notes to link'),

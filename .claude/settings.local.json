@@ -17,7 +17,8 @@
       "Bash(for f:*)",
       "Bash(do echo:*)",
       "Read(//c/Code/git/pkm-mcp/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "mcp__claude_ai_PKM_Vault__query"
     ]
   }
 }
