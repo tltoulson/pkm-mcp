@@ -59,11 +59,24 @@ function initDb(indexPath) {
   raw.pragma('journal_mode = DELETE');
   raw.pragma('synchronous = NORMAL');
 
-  // System table survives rebuilds
+  // System tables survive rebuilds
   raw.exec(`
     CREATE TABLE IF NOT EXISTS system_meta (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS oauth_clients (
+      client_id  TEXT PRIMARY KEY,
+      client_data TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS oauth_tokens (
+      refresh_token TEXT PRIMARY KEY,
+      client_id     TEXT NOT NULL,
+      scopes        TEXT NOT NULL,
+      created_at    INTEGER NOT NULL
     );
   `);
 
@@ -113,6 +126,12 @@ function initDb(indexPath) {
     `),
     getLinkedTo: raw.prepare('SELECT target_slug as slug FROM note_links WHERE source_slug = ?'),
     getLinkedFrom: raw.prepare('SELECT source_slug as slug FROM note_links WHERE target_slug = ?'),
+    // OAuth system statements
+    getOAuthClient: raw.prepare('SELECT client_data FROM oauth_clients WHERE client_id = ?'),
+    insertOAuthClient: raw.prepare('INSERT OR REPLACE INTO oauth_clients (client_id, client_data, created_at) VALUES (?, ?, ?)'),
+    insertOAuthToken: raw.prepare('INSERT OR REPLACE INTO oauth_tokens (refresh_token, client_id, scopes, created_at) VALUES (?, ?, ?, ?)'),
+    getOAuthToken: raw.prepare('SELECT * FROM oauth_tokens WHERE refresh_token = ? AND client_id = ?'),
+    deleteOAuthToken: raw.prepare('DELETE FROM oauth_tokens WHERE refresh_token = ?'),
   };
 
   /**
@@ -311,6 +330,37 @@ function initDb(indexPath) {
     pass2();
   }
 
+  function getOAuthClient(clientId) {
+    const row = stmts.getOAuthClient.get(clientId);
+    return row ? JSON.parse(row.client_data) : undefined;
+  }
+
+  function registerOAuthClient(clientData) {
+    stmts.insertOAuthClient.run(clientData.client_id, JSON.stringify(clientData), Math.floor(Date.now() / 1000));
+    return clientData;
+  }
+
+  function storeRefreshToken({ refreshToken, clientId, scopes }) {
+    stmts.insertOAuthToken.run(refreshToken, clientId, JSON.stringify(scopes), Math.floor(Date.now() / 1000));
+  }
+
+  function getRefreshToken({ refreshToken, clientId }) {
+    const row = stmts.getOAuthToken.get(refreshToken, clientId);
+    if (!row) return undefined;
+    return { ...row, scopes: JSON.parse(row.scopes) };
+  }
+
+  function rotateRefreshToken({ oldToken, newToken, clientId, scopes }) {
+    raw.transaction(() => {
+      stmts.deleteOAuthToken.run(oldToken);
+      stmts.insertOAuthToken.run(newToken, clientId, JSON.stringify(scopes), Math.floor(Date.now() / 1000));
+    })();
+  }
+
+  function deleteRefreshToken({ refreshToken }) {
+    stmts.deleteOAuthToken.run(refreshToken);
+  }
+
   function close() {
     raw.close();
   }
@@ -326,6 +376,12 @@ function initDb(indexPath) {
     ftsSearch,
     getLinked,
     getNotesContent,
+    getOAuthClient,
+    registerOAuthClient,
+    storeRefreshToken,
+    getRefreshToken,
+    rotateRefreshToken,
+    deleteRefreshToken,
     close,
   };
 }

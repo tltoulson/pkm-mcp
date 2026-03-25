@@ -46,6 +46,7 @@ Work through these naturally across the conversation — not as a checklist:
 - Do they use Obsidian or other tools alongside this? Any existing conventions?
 - What methodology if any do they follow (GTD, PARA, etc.) — or did they roll their own?
 - What has felt wrong or broken about past systems?
+- Do they prefer to see things (like task lists for example) presented more graphically when possible or are simple text responses sufficient
 - Make note of the language and terms they use (task or todo), adopt the language of the user
 
 ## What Makes a Good Vault
