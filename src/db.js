@@ -361,6 +361,25 @@ function initDb(indexPath) {
     stmts.deleteOAuthToken.run(refreshToken);
   }
 
+  /**
+   * Read a value from system_meta.
+   * @param {string} key
+   * @returns {string|null}
+   */
+  function getSystemMeta(key) {
+    const row = raw.prepare('SELECT value FROM system_meta WHERE key = ?').get(key);
+    return row ? row.value : null;
+  }
+
+  /**
+   * Write a value to system_meta.
+   * @param {string} key
+   * @param {string} value
+   */
+  function setSystemMeta(key, value) {
+    raw.prepare('INSERT OR REPLACE INTO system_meta (key, value) VALUES (?, ?)').run(key, value);
+  }
+
   function close() {
     raw.close();
   }
@@ -382,6 +401,8 @@ function initDb(indexPath) {
     getRefreshToken,
     rotateRefreshToken,
     deleteRefreshToken,
+    getSystemMeta,
+    setSystemMeta,
     close,
   };
 }

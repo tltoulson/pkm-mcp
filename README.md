@@ -87,11 +87,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```
 vault/
-├── _system/          ← Claude instructions (managed by the server setup flow)
 └── notes/            ← All notes, flat — YYYYMMDDHHMMSS.md
 ```
 
-All notes live in `notes/` as `YYYYMMDDHHMMSS.md` files. Type, GTD state, and all other metadata live in YAML frontmatter — there are no subfolders for type or status.
+All notes live in `notes/` as `YYYYMMDDHHMMSS.md` files — tasks, projects, meetings, people, decisions, and system instruction notes alike. Type, GTD state, and all other metadata live in YAML frontmatter — there are no subfolders for type or status.
 
 The index lives outside the vault:
 ```
@@ -122,39 +121,6 @@ The server exposes standard OAuth 2.1 endpoints:
 | `GET /authorize` | Login form |
 | `POST /token` | Token exchange |
 | `POST /revoke` | Token revocation |
-
-### Connecting Claude.ai or Claude for iOS
-
-Add the server URL in Settings → Integrations. No client ID needed — the app self-registers via `/register` and walks you through the login form automatically.
-
-### Connecting Claude Desktop (remote)
-
-Update `claude_desktop_config.json`.
-
-**Option 1 — direct HTTP** (preferred):
-```json
-{
-  "mcpServers": {
-    "pkm": {
-      "url": "https://pkm.example.com/mcp"
-    }
-  }
-}
-```
-
-**Option 2 — `mcp-remote` proxy** (if Claude Desktop blocks remote HTTP servers):
-```json
-{
-  "mcpServers": {
-    "pkm": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://pkm.example.com/mcp"]
-    }
-  }
-}
-```
-
-Claude Desktop will handle the OAuth flow on first connection.
 
 ---
 
@@ -198,22 +164,22 @@ The compose file reads `VAULT_PATH`, `INDEX_PATH`, and the `OAUTH_*` vars from y
 
 On first use, tell Claude (or your AI of choice) something like:
 
-> "I've connected a PKM vault to this chat. Please call `get_vault_context` to read your instructions before we start."
+> "Let's get started with my pkm"
 
-That tool returns the system instructions stored in the vault's `_system/` folder, which tells the AI how the vault is structured, what note types exist, and how to handle common operations. On a brand new vault with no `_system/` folder yet, the server will walk through a guided setup to create it.
+That tool returns the system instruction notes stored in the vault, which tell the AI how the vault is structured, what note types exist, and how to handle common operations. On a brand new vault with no instruction notes yet, the server will walk through a guided setup to create them.
 
 ### What to expect on first run
 
-A fresh vault has no notes and no `_system/` instructions. On first connection, the AI should:
+A fresh vault has no notes and no instruction notes. On first connection, the AI should:
 
 1. Call `get_vault_context` — the server detects the missing instructions and returns a setup prompt
 2. Ask you a few questions about how you want to organize your notes (types, GTD workflow, review preferences)
-3. Write the `_system/` instruction files based on your answers
+3. Write the instruction notes into `notes/` based on your answers
 4. Confirm setup is complete
 
 This only happens once. After that, `get_vault_context` returns your instructions on every session and the AI knows how to operate your vault without re-prompting.
 
-If anything gets corrupted or you want to start fresh, delete the `_system/` folder and repeat the process.
+If anything gets corrupted or you want to start fresh, delete the instruction notes and repeat the process.
 
 ### What kinds of interactions use this tool
 

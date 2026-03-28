@@ -27,10 +27,10 @@ No GTD subfolders. State lives in frontmatter fields, queried via in-memory
 manifest or SQLite FTS5. This eliminates the folder↔frontmatter dual-write
 problem entirely.
 
-**Review logic lives in `_system`, not in code.**
+**Review logic lives in instruction notes, not in code.**
 
 `daily_review`, `weekly_review`, and `person_context` are not hardcoded tools.
-They are query patterns expressed in `_system` instructions that tell Claude
+They are query patterns expressed in instruction notes that tell Claude
 which `batch_query` or `query` calls to make. This means review protocols can
 evolve without code changes. See Design Decision #18.
 
@@ -73,13 +73,10 @@ SQLite via better-sqlite3. No Docker. No Ollama. No spaCy. No Postgres required.
 
 ```
 claud-vault/
-├── _system/          ← Claude instructions, type registry, data dictionary,
-│                       query patterns for reviews and contexts
-├── notes/            ← ALL machine-managed notes (flat, YYYYMMDDHHMMSS.md)
-│                       tasks, projects, meetings, people, decisions — everything
-│                       Type/GTD state lives in frontmatter only
-└── (anything else)   ← Obsidian Bases configs, manually managed folders,
-                        archive — none of this is touched by the MCP server
+└── notes/            ← ALL notes (flat, YYYYMMDDHHMMSS.md)
+                        tasks, projects, meetings, people, decisions,
+                        and system instruction notes — everything
+                        Type/GTD state lives in frontmatter only
 
 C:\Users\tltou\.pkm-index\   ← outside OneDrive, never synced
 ├── vault.db
@@ -363,7 +360,7 @@ batch_query({
 ```
 
 Review protocols (daily review, weekly review, person context) are expressed
-as `batch_query` or `query + include` patterns in `_system` instructions.
+as `batch_query` or `query + include` patterns in instruction notes.
 They are not hardcoded tools.
 
 ---
@@ -385,13 +382,13 @@ decide whether to summarise.
 
 ---
 
-## Query Syntax: MCP vs `_system`
+## Query Syntax: MCP vs instruction notes
 
 The MCP tool descriptions carry the minimum needed for Claude to know when and
 how to call each tool — operator names, parameter shapes, brief examples. They
 are read on every call and kept concise to limit token overhead.
 
-Full query language guidance belongs in `_system`:
+Full query language guidance belongs in instruction notes:
 - Complete operator reference with worked examples
 - When to use `batch_query` vs `query` + `include`
 - Named review patterns (daily review, weekly review, person context)
@@ -399,7 +396,7 @@ Full query language guidance belongs in `_system`:
 - Vocabulary expansion strategies for FTS
 
 This split means review protocols and query patterns can evolve without code
-changes — edit `_system`, no deploy required.
+changes — edit the instruction notes, no deploy required.
 
 ---
 
@@ -654,16 +651,16 @@ support, and the opportunity to redesign the tool surface without carrying
 forward Python idioms. No TypeScript — the codebase is small enough that the
 type safety benefit doesn't outweigh the build complexity for this use case.
 
-**18. Review logic in `_system`, not hardcoded tools**
+**18. Review logic in instruction notes, not hardcoded tools**
 `daily_review`, `weekly_review`, and `person_context` were removed as tools.
-Their logic is expressed as `batch_query` patterns in `_system` instructions.
-Rationale: hardcoded review tools encode business logic in code; when review
-priorities change (new GTD categories, different staleness thresholds, new
-review cadences), a code change and redeploy is required. With `batch_query`
-and a rich `where` operator set, the same logic lives in `_system` markdown
-files that Claude reads — editable without touching the server. New review
-patterns (quarterly review, hiring pipeline review) are prompt changes, not
-code changes.
+Their logic is expressed as `batch_query` patterns in instruction notes stored
+in the vault. Rationale: hardcoded review tools encode business logic in code;
+when review priorities change (new GTD categories, different staleness
+thresholds, new review cadences), a code change and redeploy is required. With
+`batch_query` and a rich `where` operator set, the same logic lives in
+instruction notes that Claude reads — editable without touching the server.
+New review patterns (quarterly review, hiring pipeline review) are prompt
+changes, not code changes.
 
 **19. `include` traversal vs `batch_query` — distinct primitives**
 `include` co-fetches structurally related notes for each result (e.g. a

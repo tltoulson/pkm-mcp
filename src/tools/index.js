@@ -10,6 +10,7 @@ const { register: registerProcessInboxPrep }= require('./process_inbox_prep');
 const { register: registerBatchUpdate }     = require('./batch_update');
 const { register: registerTraverseIndex }   = require('./traverse_index');
 const { register: registerGetVaultContext } = require('./get_vault_context');
+const { register: registerGetSystemType }   = require('./get_system_type');
 
 /**
  * Register all tools with the MCP server.
@@ -18,6 +19,7 @@ const { register: registerGetVaultContext } = require('./get_vault_context');
  */
 function registerAll(mcpServer, ctx) {
   registerGetVaultContext(mcpServer, ctx);
+  registerGetSystemType(mcpServer, ctx);
   registerCapture(mcpServer, ctx);
   registerUpdate(mcpServer, ctx);
   registerDelete(mcpServer, ctx);
