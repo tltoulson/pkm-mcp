@@ -49,10 +49,10 @@ Cloudflare Tunnel
 HTTP MCP Server (Node.js, port 8765)
   ├── In-memory manifest (all frontmatter, plain JS object)
   ├── SQLite vault.db (persistence + FTS5 + note_links)
-  │     located at C:\Users\tltou\.pkm-index\vault.db
+  │     located at C:\Users\<you>\.pkm-index\vault.db
   │     NOT inside OneDrive — see Design Decision #16
   ├── File watcher (chokidar, debounced 500ms)
-  └── Markdown files (C:\Users\tltou\OneDrive\claud-vault\notes\)
+  └── Markdown files (C:\Users\<you>\OneDrive\claud-vault\notes\)
 ```
 
 **Node.js dependencies:**
@@ -78,7 +78,7 @@ claud-vault/
                         and system instruction notes — everything
                         Type/GTD state lives in frontmatter only
 
-C:\Users\tltou\.pkm-index\   ← outside OneDrive, never synced
+C:\Users\<you>\.pkm-index\   ← outside OneDrive, never synced
 ├── vault.db
 └── (vault.db-wal, vault.db-shm — transient SQLite files)
 ```
@@ -92,7 +92,7 @@ patch — no file move required. The MCP server only reads and writes
 
 ## SQLite Schema
 
-Single file at `C:\Users\tltou\.pkm-index\vault.db`. Two namespaces:
+Single file at `C:\Users\<you>\.pkm-index\vault.db`. Two namespaces:
 
 ```sql
 -- SYSTEM TABLES — survive vault rebuilds, never queried for note content
@@ -494,8 +494,8 @@ Cloudflare Tunnel runs as a separate Windows service (`cloudflared`).
 ### Environment Variables (`.env`)
 
 ```
-VAULT_PATH=C:\Users\tltou\OneDrive\claud-vault
-INDEX_PATH=C:\Users\tltou\.pkm-index
+VAULT_PATH=C:\Users\<you>\OneDrive\claud-vault
+INDEX_PATH=C:\Users\<you>\.pkm-index
 MCP_PORT=8765
 ```
 
@@ -635,7 +635,7 @@ vault tables — rebuilt from markdown files when schema version changes.
 
 **15. Index lives outside OneDrive**
 SQLite file locking conflicts with OneDrive sync. WAL mode sidecar files
-(`-wal`, `-shm`) compound this. Index at `C:\Users\tltou\.pkm-index\vault.db`.
+(`-wal`, `-shm`) compound this. Index at `C:\Users\<you>\.pkm-index\vault.db`.
 Always rebuildable from files in seconds.
 
 **16. Obsidian short-form slug resolution — eliminated**
