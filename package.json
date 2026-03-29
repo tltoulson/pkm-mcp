@@ -16,7 +16,11 @@
     "express": "^4.21.0",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.9.0",
+    "mime-types": "^2.1.35",
+    "pdf-parse": "^1.1.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

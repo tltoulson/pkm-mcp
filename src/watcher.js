@@ -5,7 +5,9 @@ const path = require('path');
 const matter = require('gray-matter');
 const { extractLinks } = require('./utils/links');
 const { addToCache, removeFromCache } = require('./noteCache');
-const { pathToId } = require('./utils/timestamp');
+const { pathToId, generateId, idToPath } = require('./utils/timestamp');
+const { writeNote, nowTimestamp } = require('./utils/frontmatter');
+const { extractText } = require('./extractor');
 
 const LAST_SYNC_KEY = 'watcher_last_sync';
 
@@ -44,7 +46,157 @@ function startWatcher(vaultPath, db, noteCache) {
     db.raw.prepare('INSERT OR REPLACE INTO system_meta (key, value) VALUES (?, ?)').run(LAST_SYNC_KEY, date.toISOString());
   }
 
+  /**
+   * Scan attachments/inbox/ for new files and kick off async ingestion for each.
+   * The file is moved out of inbox synchronously before async extraction begins,
+   * preventing double-processing on the next poll tick.
+   */
+  function pollInbox() {
+    const inboxDir = path.join(vaultPath, 'attachments', 'inbox');
+    if (!fs.existsSync(inboxDir)) return;
+
+    let files;
+    try {
+      files = fs.readdirSync(inboxDir).filter(f => !f.startsWith('.'));
+    } catch (err) {
+      console.error(`watcher: failed to read inbox: ${err.message}`);
+      return;
+    }
+
+    for (const filename of files) {
+      const srcPath = path.join(inboxDir, filename);
+      let stat;
+      try {
+        stat = fs.statSync(srcPath);
+      } catch { continue; }
+      if (!stat.isFile()) continue;
+
+      // Move to attachments/YYYY/ synchronously — prevents re-processing next tick
+      const destInfo = moveToAttachments(srcPath, filename);
+      if (!destInfo) continue;
+
+      // Async extraction + note creation (fire and forget; errors are logged)
+      processAttachment(destInfo.destPath, destInfo.relPath, filename).catch(err => {
+        console.error(`watcher: attachment processing failed for ${filename}: ${err.message}`);
+      });
+    }
+  }
+
+  /**
+   * Move a file from inbox to attachments/YYYY/ with a date prefix.
+   * Returns null on failure (leaves file in inbox for next attempt).
+   *
+   * @param {string} srcPath - Absolute source path
+   * @param {string} filename - Original filename
+   * @returns {{ destPath: string, relPath: string }|null}
+   */
+  function moveToAttachments(srcPath, filename) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const datePrefix = `${year}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const destDir = path.join(vaultPath, 'attachments', String(year));
+
+    // Build a unique destination filename (avoid collisions)
+    let destFilename = `${datePrefix}_${filename}`;
+    let destPath = path.join(destDir, destFilename);
+    let counter = 1;
+    while (fs.existsSync(destPath)) {
+      const ext = path.extname(filename);
+      const base = path.basename(filename, ext);
+      destFilename = `${datePrefix}_${base}_${counter}${ext}`;
+      destPath = path.join(destDir, destFilename);
+      counter++;
+    }
+
+    const relPath = `attachments/${year}/${destFilename}`;
+
+    try {
+      fs.mkdirSync(destDir, { recursive: true });
+      fs.copyFileSync(srcPath, destPath);
+      fs.unlinkSync(srcPath); // inbox clean — no re-processing risk
+    } catch (err) {
+      console.error(`watcher: failed to move ${filename} to attachments: ${err.message}`);
+      return null;
+    }
+
+    console.log(`watcher: moved ${filename} → ${relPath}`);
+    return { destPath, relPath };
+  }
+
+  /**
+   * Extract text from an attachment, create a companion .md note, and update DB/cache.
+   *
+   * @param {string} destPath - Absolute path to the attachment file in attachments/YYYY/
+   * @param {string} relPath  - Vault-relative path, e.g. "attachments/2026/20260329_report.pdf"
+   * @param {string} originalFilename - The original filename before date-prefixing
+   */
+  async function processAttachment(destPath, relPath, originalFilename) {
+    // Extraction is best-effort. Any failure — including unexpected throws from
+    // extractText — must not prevent the attachment note from being created.
+    // A note with extraction: failed is always better than no note at all.
+    let text = '';
+    let pageCount = null;
+    let mimeType = 'application/octet-stream';
+    let extractionStatus = 'failed';
+    try {
+      ({ text, pageCount, mimeType, extractionStatus } = await extractText(destPath));
+    } catch (err) {
+      console.warn(`watcher: extractText threw for ${originalFilename}: ${err.message}`);
+      const mime = require('mime-types');
+      mimeType = mime.lookup(destPath) || 'application/octet-stream';
+    }
+
+    const noteId = generateId();
+    const notePath = idToPath(vaultPath, noteId);
+    const ts = nowTimestamp();
+    const baseName = path.basename(originalFilename, path.extname(originalFilename));
+    let fileSize = 0;
+    try { fileSize = fs.statSync(destPath).size; } catch (_) { /* file moved or deleted */ }
+
+    const frontmatterData = {
+      type: '$attachment',
+      title: baseName,
+      created: ts,
+      modified: ts,
+      extraction: extractionStatus,
+      source_file: relPath,
+      original_filename: originalFilename,
+      file_type: mimeType,
+      file_size: fileSize,
+      ...(pageCount !== null ? { page_count: pageCount } : {}),
+    };
+
+    const body = text ? `\n${text}\n` : '';
+
+    writeNote(notePath, frontmatterData, body);
+
+    // Update DB (same pattern as the regular notes sync)
+    const { type, title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+    const dbMetadata = { ...rest, aliases: aliases || undefined, _body: body };
+    const noteFields = {
+      type: '$attachment',
+      title: baseName,
+      created: ts,
+      modified: ts,
+      superseded_by: null,
+      supersedes: null,
+      metadata: dbMetadata,
+    };
+
+    db.upsertNote(noteId, noteFields);
+    const links = extractLinks(noteId, frontmatterData, body);
+    db.upsertNoteLinks(noteId, links);
+    addToCache(noteCache, noteId, noteFields);
+
+    console.log(`watcher: ingested ${originalFilename} → ${noteId} (extraction: ${extractionStatus})`);
+  }
+
   function poll() {
+    // Process any files dropped into attachments/inbox/ before the regular notes sync.
+    // Inbox files are moved synchronously, so the companion notes they produce will
+    // be picked up by the notes pass on this same tick or the next one.
+    pollInbox();
+
     const pollStartedAt = new Date();
     try {
       const lastSync = getLastSync();

@@ -47,20 +47,19 @@ Cloudflare Tunnel
         │
         ▼
 HTTP MCP Server (Node.js, port 8765)
-  ├── In-memory manifest (all frontmatter, plain JS object)
+  ├── In-memory note cache (all frontmatter, plain JS object)
   ├── SQLite vault.db (persistence + FTS5 + note_links)
   │     located at C:\Users\<you>\.pkm-index\vault.db
-  │     NOT inside OneDrive — see Design Decision #16
-  ├── File watcher (chokidar, debounced 500ms)
+  │     NOT inside OneDrive — see Design Decision #15
+  ├── Polling watcher (mtime comparison, default 2000ms)
   └── Markdown files (C:\Users\<you>\OneDrive\claud-vault\notes\)
 ```
 
 **Node.js dependencies:**
 ```
 @modelcontextprotocol/sdk   HTTP MCP server (StreamableHTTP transport)
-better-sqlite3               Synchronous SQLite with WAL mode
+better-sqlite3               Synchronous SQLite with DELETE journal mode
 gray-matter + js-yaml        Frontmatter parse/serialize
-chokidar                     File watcher
 express                      HTTP server
 dotenv                       Environment config
 ```
@@ -79,13 +78,12 @@ claud-vault/
                         Type/GTD state lives in frontmatter only
 
 C:\Users\<you>\.pkm-index\   ← outside OneDrive, never synced
-├── vault.db
-└── (vault.db-wal, vault.db-shm — transient SQLite files)
+└── vault.db
 ```
 
 No type subfolders inside `notes/`. No GTD subfolders. State lives in
-frontmatter fields, queried via manifest. Completing a task is an `update`
-patch — no file move required. The MCP server only reads and writes
+frontmatter fields, queried via the in-memory note cache. Completing a task
+is an `update_note` patch — no file move required. The MCP server only reads and writes
 `claud-vault/notes/`. Everything else in the vault root is untouched.
 
 ---
@@ -106,10 +104,9 @@ CREATE TABLE system_meta (
 -- VAULT TABLES — rebuilt from markdown files on schema version change
 
 CREATE TABLE notes (
-    id            TEXT PRIMARY KEY,  -- slug: "tasks/2026-03-14-expense-report"
+    id            TEXT PRIMARY KEY,  -- timestamp ID: "20260314123045"
     type          TEXT NOT NULL,
     title         TEXT NOT NULL,
-    folder        TEXT NOT NULL,
     created       TEXT,
     modified      TEXT,
     superseded_by TEXT,
@@ -141,19 +138,18 @@ persistence layer, FTS5 content search, and note_links graph queries.
 
 ---
 
-## In-Memory Manifest
+## In-Memory Note Cache
 
-All frontmatter for all non-superseded notes. Populated from SQLite on startup,
-updated in-place on every write. Never re-read from disk per call.
+All frontmatter for all notes. Populated from SQLite on startup, updated
+in-place on every write. Never re-read from disk per call.
 
 ```js
-manifest = {
-  "tasks/2026-03-14-expense-report": {
-    id:            "tasks/2026-03-14-expense-report",
+noteCache = {
+  "20260314123045": {
+    id:            "20260314123045",
     type:          "task",
     title:         "Complete expense report — Government Forum",
     aliases:       ["Complete expense report — Government Forum"],
-    folder:        "tasks",
     created:       "2026-03-05T12:00:00",
     modified:      "2026-03-13T09:30:00",
     superseded_by: null,
@@ -166,7 +162,8 @@ manifest = {
 }
 ```
 
-Superseded notes (where `superseded_by` is set) are excluded from the manifest.
+**Superseded notes are included in the cache** (with `superseded_by` set).
+Query results exclude them by default unless `include_superseded: true`.
 They remain in SQLite and on disk, retrievable via `get_note` explicitly.
 
 ---
@@ -202,9 +199,9 @@ if (db.raw.prepare('SELECT COUNT(*) as c FROM notes').get().c === 0) {
   db.scanVault(vaultPath);           // two-pass: notes first, links second
 }
 
-const manifest = initManifest(db);   // load all non-superseded notes from SQLite
+const noteCache = initNoteCache(db); // load all notes from SQLite (including superseded)
 
-const watcher = startWatcher(vaultPath, db, manifest);  // debounced file watcher
+const watcher = startWatcher(vaultPath, db, noteCache);  // polling watcher (mtime, 2000ms)
 ```
 
 ---
@@ -215,7 +212,7 @@ const watcher = startWatcher(vaultPath, db, manifest);  // debounced file watche
 Tool call arrives
     │
     ├── query(where) — GTD / status / due / any metadata filter
-    │       → manifest (in-memory JS object, no I/O)
+    │       → noteCache (in-memory JS object, no I/O)
     │
     ├── query(search) — Full-text content search
     │       → SQLite FTS5 (BM25 + title/alias boost)
@@ -224,7 +221,7 @@ Tool call arrives
     │       → SQLite note_links (bidirectional UNION query)
     │
     ├── query(include) — Traversal: co-fetch related notes per result
-    │       → note_links lookup + manifest filter (no extra SQL per field)
+    │       → note_links lookup + noteCache filter (no extra SQL per field)
     │
     ├── query(result_format="full") — Body content for result set
     │       → SQLite notes_fts (single batch IN query, not file reads)
@@ -238,38 +235,32 @@ Tool call arrives
 
 ---
 
-## Tool Reference (11 tools)
+## Tool Reference (12 tools)
 
 ### Write Path
 
 | Tool | Input | Effect |
 |------|-------|--------|
-| `capture` | content, suggested_type, title?, metadata?, related_note_ids?, suggested_folder? | File write + SQLite + manifest |
-| `update` | id, content?, title?, metadata? | Atomic file patch + SQLite + manifest |
-| `delete` | id, confirm_id | File delete + SQLite + manifest |
+| `capture` | content, suggested_type, title?, metadata?, related_note_ids? | File write + SQLite + noteCache |
+| `update_note` | id, content?, title?, metadata? | Atomic file patch + SQLite + noteCache |
+| `delete_note` | id, confirm_id | File delete + SQLite + noteCache |
 
 **`capture`** is the only write path for new notes. Returns `created_note_id`
 and `suggested_links` for any `related_note_ids` passed in.
 
-**`update` is a surgical patch** — parse → mutate only specified keys →
+**`update_note` is a surgical patch** — parse → mutate only specified keys →
 atomic write (tmp + rename). Obsidian-safe. GTD transitions are metadata
 patches only — no file moves.
-
-### File Operations
-
-**`relocate(id, folder?, title?)`** — Move and/or rename a note. At least one
-of `folder` or `title` required. Returns the new slug. File operation only —
-does NOT modify `gtd`, `status`, or any frontmatter state fields.
 
 ### Query
 
 **`query`** — Single structured retrieval primitive.
 
-Pipeline: `where (manifest) → FTS → linked → sort → limit → shape → include`
+Pipeline: `where (noteCache) → FTS → linked → sort → limit → shape → include`
 
 #### `where` — Metadata filter
 
-Keys validated dynamically against the live manifest key universe. Unknown
+Keys validated dynamically against the live noteCache key universe. Unknown
 keys return a validation error. All operators:
 
 | Operator | Syntax | Example |
@@ -341,6 +332,26 @@ for superseded notes. Cheaper than `query` for known slugs.
 
 ---
 
+**`get_system_type(type_ids?, note_ids?)`** — Retrieve one or more
+user-defined type notes (`$system` subtype:type) by `type_id` or note ID.
+Returns full note bodies in a single call. Call this before any interaction
+with notes of a given type — type notes define fields, rules, and processes.
+
+---
+
+**`get_vault_context()`** — Returns the root INSTRUCTIONS note (system
+orientation). Call this at the start of any session to load vault context.
+
+---
+
+**`get_attachment(note_id?, source_file?)`** — Returns an attachment binary
+as base64 for vision-based enrichment. Token-expensive — use only when
+text extraction failed or table/layout fidelity is critical. Resolves path
+from the companion attachment note's `source_file` field or a vault-relative
+path directly.
+
+---
+
 **`batch_query({ queries: { name: querySpec, ... } })`** — Run multiple
 independent named queries in a single round trip. Each value is a full `query`
 argument object. Results are keyed by name. Individual failures return
@@ -402,23 +413,20 @@ changes — edit the instruction notes, no deploy required.
 
 ## Key Implementation Details
 
-### Filename Generation
+### Note ID Generation
 
 ```js
-function generateFilename(title, date = null) {
-  // Strip leading date from title to prevent double-dating
-  const clean = title.replace(/^\d{4}-\d{2}-\d{2}[- ]?/, '');
-  const slug = clean.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 50);
-  const prefix = date || new Date().toISOString().slice(0, 10);
-  return `${prefix}-${slug}`;
+function generateId() {
+  // Format: YYYYMMDDHHmmss (14 digits, assigned once at creation)
+  const now = new Date();
+  return String(now.getFullYear()) + pad(now.getMonth() + 1) + pad(now.getDate())
+       + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
 }
 ```
 
-All notes are date-prefixed. Date comes from the note's own `created` field
-when preserving on rename/move, or today's date on create.
+All notes get a pure timestamp ID at creation (e.g. `20260314123045`). The ID
+is also the filename (`20260314123045.md`) and never changes after creation.
+There is no title-to-slug conversion — the title lives only in frontmatter.
 
 ### Timestamps
 
@@ -428,7 +436,7 @@ without timezone offset: `new Date().toISOString().slice(0, 19)` →
 
 ### Atomic Writes
 
-`update` and `relocate` write via tmp file + `fs.renameSync`:
+`update_note` writes via tmp file + `fs.renameSync`:
 
 ```js
 fs.writeFileSync(filepath + '.tmp', newContent, 'utf8');
@@ -452,26 +460,16 @@ Note body:           [[wikilink]] patterns              → link_type = 'body'
 extracted as `body` links. `person_context`-style queries use bidirectional
 `note_links` queries to find meeting/task/decision connections.
 
-### Partial Slug Resolution
-
-Obsidian stores wikilinks as shortest-path filenames. Resolution happens in
-`upsertNoteLinks` before every insert:
-
-```js
-function resolveSlug(target) {
-  if (target.includes('/')) return target; // already a full path
-  const row = db.prepare("SELECT id FROM notes WHERE id LIKE ?")
-    .get('%/' + target);
-  return row ? row.id : target;
-}
-```
-
 ### Watcher Sync
 
-On file change (debounced 500ms via chokidar `awaitWriteFinish`): re-reads
-frontmatter, upserts note + FTS + note_links, updates manifest. On delete:
-removes from all tables and manifest. Applies to Obsidian edits, manual saves
-— anything touching the vault directory.
+On each poll tick (default 2000ms): finds all `.md` files in `notes/` with
+`mtime > last_sync`. Two-pass: upserts notes first, then links. Updates
+noteCache. On delete: removes from all tables and noteCache. Catches downtime
+changes immediately on startup. Works on Samba, Docker bind mounts, NFS.
+
+Slug resolution in `upsertNoteLinks` is an exact-match lookup — in the flat
+timestamp-ID vault, wikilinks are already full IDs. No LIKE pattern needed
+(see Design Decision #16).
 
 ---
 

@@ -32,12 +32,15 @@ notes) define their specific choices and live in the vault.
 The PKM system is layered. Load notes in this order:
 
 **Every session:**
-1. Call \`get_vault_context\` — returns this note, the Universal Type note, and
-   the user's system INSTRUCTIONS (or onboarding prompt if vault is unconfigured)
-   all in one response
+1. Call \`get_vault_context\` — returns this note, the Universal Type note,
+   the \`$attachment\` type definition, and the user's system INSTRUCTIONS
+   (or onboarding prompt if vault is unconfigured) all in one response.
+   The \`$attachment\` type is metasystem infrastructure — its full definition
+   (fields, rules, processes, reports) is in the \`attachment_type\` key of
+   the response. No separate \`get_system_type\` call needed for it.
 
 **On demand — load only when relevant to the current session:**
-2. For any note operation involving a specific type, call \`get_system_type\`
+2. For any note operation involving a user-defined type, call \`get_system_type\`
    with the relevant type_ids before acting. The type's ID is in the user's
    INSTRUCTIONS type registry.
 
@@ -69,6 +72,17 @@ repeated in type notes. When working with any note type:
    fields, rules, processes, and reports
 3. Treat both field sets as additive — the note carries all universal fields
    plus all type-specific fields
+
+## Machine-Generated Note Types
+
+Some note types are created automatically by the vault server — never by Claude
+or the user via \`capture\`. Treat these as enrichable: Claude can update and
+enrich them, but must never create them manually.
+
+**\`$attachment\`** is the only machine-generated type. Its full definition —
+fields, rules, processes (including the attachment enrichment workflow and vision
+fallback), and reports — is in the \`attachment_type\` key returned by
+\`get_vault_context\`. Read it before working with any \`$attachment\` note.
 
 ## Classifying a Note
 
@@ -774,17 +788,119 @@ Keep these in mind when advising and drafting:
   the thinking`;
 
 // ---------------------------------------------------------------------------
+// $attachment type — metasystem-embedded, machine-generated type definition.
+// Returned in every get_vault_context response alongside Universal Type.
+// Not stored in the vault because it is server-owned infrastructure.
+// ---------------------------------------------------------------------------
+
+const ATTACHMENT_TYPE = `---
+type: $system
+subtype: type
+type_id: $attachment
+title: 'Type: $attachment'
+description: A binary file ingested from attachments/inbox/ — PDF, DOCX, XLSX,
+  or similar. Created automatically by the vault watcher. Contains extracted
+  text in the body and file metadata in frontmatter.
+when_to_use: This type is watcher-generated. Never capture manually. Notes of
+  this type exist when a file has been dropped into attachments/inbox/ and
+  processed by the server.
+when_not_to_use: Do not create $attachment notes via capture. Do not use for
+  external links or written references — use the reference type for those.
+created: <auto>
+modified: <auto>
+---
+
+## Description
+
+A binary file ingested automatically by the vault watcher. When a file is
+dropped into \`attachments/inbox/\`, the watcher moves it to \`attachments/YYYY/\`,
+runs text extraction (PDF via pdf-parse, DOCX via mammoth, XLSX via xlsx,
+plain text raw), and creates this companion note. The binary is preserved at
+\`source_file\`; extracted text is in the note body.
+
+## Boundary Notes
+
+\`$attachment\` is for auto-ingested binary files only. For external links or
+documents you want to reference by URL, use \`reference\`. For your own writing,
+use \`note\`. Never create \`$attachment\` notes manually.
+
+## Fields
+
+| name | data_type | required | valid_values | default | description | rules |
+|------|-----------|----------|--------------|---------|-------------|-------|
+| \`source_file\` | string | yes | — | — | Vault-relative path to the binary file, e.g. \`attachments/2026/20260329_report.pdf\` | Set by watcher — do not change |
+| \`extraction\` | choice | yes | raw, failed, enriched | raw | State of content extraction | raw = watcher extracted text, Claude has not reviewed; failed = little/no text extracted (likely scanned or image-only); enriched = Claude has processed and enriched |
+| \`original_filename\` | string | yes | — | — | Filename as dropped into inbox, before date-prefixing | Set by watcher — do not change |
+| \`file_type\` | string | yes | — | — | MIME type detected from file extension | Set by watcher |
+| \`file_size\` | number | yes | — | — | File size in bytes | Set by watcher |
+| \`page_count\` | number | no | — | — | Page count, set for PDFs only | Set by watcher |
+
+## Rules
+
+| statement | severity | rationale |
+|---|---|---|
+| Never create \`$attachment\` notes via \`capture\` — they are watcher-generated | hard | The watcher sets required fields that cannot be reliably replicated manually |
+| Never modify \`source_file\` or \`original_filename\` | hard | These are the permanent record of where the file came from |
+| Set \`extraction: enriched\` after Claude has processed and enriched the note | hard | Drives the unprocessed attachments query |
+| The \`$attachment\` type is not user-configurable — do not add it to the user's type registry or INSTRUCTIONS note | hard | It is metasystem infrastructure, not a user-defined type |
+
+## Processes
+
+### Process Attachments
+**Trigger:** User says "process attachments", "process my attachment inbox",
+"check my attachments", or similar — including during daily/weekly review.
+
+**Steps:**
+1. Query for unprocessed attachments:
+   \`where: { type: "$attachment", extraction: { in: ["raw", "failed"] } }\`
+2. If result is empty: "No attachments waiting — your inbox is clear."
+3. Present the list to the user: titles, original filenames, file types, sizes.
+4. For each attachment, in order:
+   a. Summarize what was extracted (or note that extraction failed).
+   b. For \`extraction: failed\` — offer the vision fallback (see Vision Fallback
+      process below). Do not proceed without user decision.
+   c. Ask the user for context: "What is this? Anything to link it to?"
+   d. Enrich: write a summary, update the title if the auto-generated name is
+      poor, \`related\` links as appropriate.
+   e. Append the original extracted text to the bottom section of the note   
+   f. Set \`extraction: enriched\`.
+5. Report how many were processed when done.
+
+### Vision Fallback (Scanned / Image PDFs)
+**Trigger:** \`extraction: failed\` — little or no text was extracted (likely a
+scanned document, image-only PDF, or corrupted file).
+
+**Steps:**
+1. Warn the user: "This looks like a scanned document — text extraction failed.
+   I can process it with vision but it'll use significantly more tokens
+   (~50K+ for a 10-page PDF). Want me to proceed?"
+2. If yes: call \`get_attachment\` with the \`note_id\`.
+3. Process the returned base64 content with vision — extract text, tables,
+   and structure as accurately as possible.
+4. Update the note body with the vision-extracted content.
+5. Set \`extraction: enriched\`.
+
+## Reports
+
+### Unprocessed Attachments
+**Description:** All attachments awaiting Claude enrichment.
+**Query:** \`where: { type: "$attachment", extraction: { in: ["raw", "failed"] } }\`
+**Output:** List with title, original_filename, file_type, file_size,
+extraction status, and created date.`;
+
+// ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
 
 /**
  * Get vault operating context.
- * Always returns the two metasystem notes (static, server-embedded).
+ * Always returns three metasystem notes (static, server-embedded):
+ *   meta_instructions, universal_type, attachment_type
  * Also returns the $system INSTRUCTIONS note body if the vault is configured,
  * or an onboarding prompt if it is not.
  *
  * @param {object} ctx - { db, noteCache }
- * @returns {{ meta_instructions, universal_type, system_instructions }}
+ * @returns {{ meta_instructions, universal_type, attachment_type, system_instructions }}
  */
 function getVaultContextImpl(ctx) {
   const { db, noteCache } = ctx;
@@ -818,6 +934,7 @@ function getVaultContextImpl(ctx) {
   const result = {
     meta_instructions: { title: 'Meta-INSTRUCTIONS', body: META_INSTRUCTIONS },
     universal_type: { title: 'Universal Type', body: UNIVERSAL_TYPE },
+    attachment_type: { title: 'Type: $attachment', body: ATTACHMENT_TYPE },
     system_instructions,
   };
 
@@ -838,9 +955,9 @@ function register(mcpServer, ctx) {
     'get_vault_context',
     'Get vault operating context. Call this at the start of every session before any vault ' +
     'operations — it returns everything needed to understand the system: the metasystem notes ' +
-    '(Meta-INSTRUCTIONS and Universal Type) plus the vault\'s system INSTRUCTIONS. If the vault ' +
-    'is not yet configured, returns an onboarding prompt in place of system instructions. ' +
-    'Never perform vault operations without loading this context first.',
+    '(Meta-INSTRUCTIONS, Universal Type, and the $attachment type definition) plus the vault\'s ' +
+    'system INSTRUCTIONS. If the vault is not yet configured, returns an onboarding prompt in ' +
+    'place of system instructions. Never perform vault operations without loading this context first.',
     {},
     async () => {
       const result = getVaultContextImpl(ctx);

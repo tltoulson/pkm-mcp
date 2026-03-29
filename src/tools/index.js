@@ -11,6 +11,7 @@ const { register: registerBatchUpdate }     = require('./batch_update');
 const { register: registerTraverseIndex }   = require('./traverse_index');
 const { register: registerGetVaultContext } = require('./get_vault_context');
 const { register: registerGetSystemType }   = require('./get_system_type');
+const { register: registerGetAttachment }   = require('./get_attachment');
 
 /**
  * Register all tools with the MCP server.
@@ -29,6 +30,7 @@ function registerAll(mcpServer, ctx) {
   registerProcessInboxPrep(mcpServer, ctx);
   registerBatchUpdate(mcpServer, ctx);
   registerTraverseIndex(mcpServer, ctx);
+  registerGetAttachment(mcpServer, ctx);
 }
 
 module.exports = { registerAll };

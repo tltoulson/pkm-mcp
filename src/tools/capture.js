@@ -119,7 +119,7 @@ function register(mcpServer, ctx) {
     'Capture a new note, task, project, meeting, decision, or other item in the PKM vault',
     {
       content: z.string().optional().describe('Body content of the note (markdown)'),
-      suggested_type: z.string().optional().describe('Type of note to create. Regular types: task, project, note, journal, person, meeting, decision, reference, index. Sentinel types (reserved): $system. Unknown $-prefixed types are rejected.'),
+      suggested_type: z.string().optional().describe('Type of note to create. Regular types: task, project, note, journal, person, meeting, decision, reference, index. Sentinel types (reserved): $system. Machine-generated sentinel types (watcher-only, never capture manually): $attachment. Unknown $-prefixed types are rejected.'),
       title: z.string().optional().describe('Title of the note (derived from content if omitted)'),
       metadata: z.record(z.string(), z.unknown()).optional().describe('Additional frontmatter fields'),
       related_note_ids: z.array(z.string()).optional().describe('IDs of related notes to link'),

@@ -11,6 +11,7 @@
  */
 const SENTINEL_TYPES = new Set([
   '$system',
+  '$attachment',
 ]);
 
 /**
