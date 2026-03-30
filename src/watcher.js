@@ -47,12 +47,12 @@ function startWatcher(vaultPath, db, noteCache) {
   }
 
   /**
-   * Scan attachments/inbox/ for new files and kick off async ingestion for each.
+   * Scan _inbox/ (vault root) for new files and kick off async ingestion for each.
    * The file is moved out of inbox synchronously before async extraction begins,
    * preventing double-processing on the next poll tick.
    */
   function pollInbox() {
-    const inboxDir = path.join(vaultPath, 'attachments', 'inbox');
+    const inboxDir = path.join(vaultPath, '_inbox');
     if (!fs.existsSync(inboxDir)) return;
 
     let files;
@@ -192,7 +192,7 @@ function startWatcher(vaultPath, db, noteCache) {
   }
 
   function poll() {
-    // Process any files dropped into attachments/inbox/ before the regular notes sync.
+    // Process any files dropped into _inbox/ before the regular notes sync.
     // Inbox files are moved synchronously, so the companion notes they produce will
     // be picked up by the notes pass on this same tick or the next one.
     pollInbox();

@@ -462,10 +462,17 @@ extracted as `body` links. `person_context`-style queries use bidirectional
 
 ### Watcher Sync
 
-On each poll tick (default 2000ms): finds all `.md` files in `notes/` with
-`mtime > last_sync`. Two-pass: upserts notes first, then links. Updates
-noteCache. On delete: removes from all tables and noteCache. Catches downtime
-changes immediately on startup. Works on Samba, Docker bind mounts, NFS.
+On each poll tick (default 2000ms): first scans `_inbox/` (vault root) for
+new binary files, moves each to `attachments/YYYY/` with a date prefix, and
+fires async text extraction + companion note creation. Then finds all `.md`
+files in `notes/` with `mtime > last_sync`. Two-pass: upserts notes first,
+then links. Updates noteCache. On delete: removes from all tables and
+noteCache. Catches downtime changes immediately on startup. Works on Samba,
+Docker bind mounts, NFS.
+
+Drop files into `_inbox/`. The `_inbox/` folder
+lives at the vault root so it is easily accessible and visually distinct from
+the processed `attachments/` tree.
 
 Slug resolution in `upsertNoteLinks` is an exact-match lookup — in the flat
 timestamp-ID vault, wikilinks are already full IDs. No LIKE pattern needed

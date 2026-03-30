@@ -798,11 +798,11 @@ type: $system
 subtype: type
 type_id: $attachment
 title: 'Type: $attachment'
-description: A binary file ingested from attachments/inbox/ — PDF, DOCX, XLSX,
+description: A binary file ingested from _inbox/ — PDF, DOCX, XLSX,
   or similar. Created automatically by the vault watcher. Contains extracted
   text in the body and file metadata in frontmatter.
 when_to_use: This type is watcher-generated. Never capture manually. Notes of
-  this type exist when a file has been dropped into attachments/inbox/ and
+  this type exist when a file has been dropped into _inbox/ and
   processed by the server.
 when_not_to_use: Do not create $attachment notes via capture. Do not use for
   external links or written references — use the reference type for those.
@@ -813,7 +813,7 @@ modified: <auto>
 ## Description
 
 A binary file ingested automatically by the vault watcher. When a file is
-dropped into \`attachments/inbox/\`, the watcher moves it to \`attachments/YYYY/\`,
+dropped into \`_inbox/\`, the watcher moves it to \`attachments/YYYY/\`,
 runs text extraction (PDF via pdf-parse, DOCX via mammoth, XLSX via xlsx,
 plain text raw), and creates this companion note. The binary is preserved at
 \`source_file\`; extracted text is in the note body.
@@ -830,7 +830,7 @@ use \`note\`. Never create \`$attachment\` notes manually.
 |------|-----------|----------|--------------|---------|-------------|-------|
 | \`source_file\` | string | yes | — | — | Vault-relative path to the binary file, e.g. \`attachments/2026/20260329_report.pdf\` | Set by watcher — do not change |
 | \`extraction\` | choice | yes | raw, failed, enriched | raw | State of content extraction | raw = watcher extracted text, Claude has not reviewed; failed = little/no text extracted (likely scanned or image-only); enriched = Claude has processed and enriched |
-| \`original_filename\` | string | yes | — | — | Filename as dropped into inbox, before date-prefixing | Set by watcher — do not change |
+| \`original_filename\` | string | yes | — | — | Filename as dropped into _inbox/, before date-prefixing | Set by watcher — do not change |
 | \`file_type\` | string | yes | — | — | MIME type detected from file extension | Set by watcher |
 | \`file_size\` | number | yes | — | — | File size in bytes | Set by watcher |
 | \`page_count\` | number | no | — | — | Page count, set for PDFs only | Set by watcher |
