@@ -304,10 +304,11 @@ function initDb(indexPath) {
         // Store body in metadata._body for FTS indexing
         const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
 
-        const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
+        if (!title) console.warn(`scanVault: note ${id} is missing required field: title`);
+        if (!frontmatterData.type) console.warn(`scanVault: note ${id} is missing required field: type`);
         upsertNote(id, {
           type,
-          title: title || firstAlias || id,
+          title: title || null,
           created: created || null,
           modified: modified || null,
           superseded_by: superseded_by || null,

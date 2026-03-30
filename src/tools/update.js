@@ -63,7 +63,7 @@ async function updateImpl(args, ctx) {
 
   db.upsertNote(id, {
     type: data.type || 'note',
-    title: data.title || id,
+    title: data.title || null,
     created: data.created || null,
     modified: data.modified,
     superseded_by: data.superseded_by || null,

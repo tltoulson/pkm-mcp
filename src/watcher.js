@@ -252,12 +252,12 @@ function startWatcher(vaultPath, db, noteCache) {
 
           const type = frontmatterData.type || 'note';
           const { title, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
-          const firstAlias = Array.isArray(aliases) ? aliases[0] : aliases;
-          const effectiveTitle = title || firstAlias || id;
+          if (!title) console.warn(`watcher: note ${id} is missing required field: title`);
+          if (!frontmatterData.type) console.warn(`watcher: note ${id} is missing required field: type`);
           const metadata = { ...rest, aliases: aliases || undefined, _body: bodyContent };
           const noteFields = {
             type,
-            title: effectiveTitle,
+            title: title || null,
             created: created || null,
             modified: modified || null,
             superseded_by: superseded_by || null,
