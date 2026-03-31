@@ -192,16 +192,42 @@ function register(mcpServer, ctx) {
         '{before, after} (date range), {in: []}, {not_in: []}, {ne: value}, ' +
         '{contains: str}, {not_contains: str}, {starts_with: str}, {ends_with: str}.'
       ),
-      search: z.string().optional().describe('Full-text search query (FTS5 syntax, supports OR/NOT/phrases)'),
-      linked: z.record(z.string(), z.unknown()).optional().describe('Structural link filter: { id: slug, direction: "to"|"from"|"any" }'),
+      search: z.string().optional().describe(
+        'Full-text search across note body and title (SQLite FTS5). ' +
+        'Plain keywords are AND-ed by default: "deploy config" matches notes containing both words. ' +
+        'Operators: OR ("deploy OR rollback"), NOT ("deploy NOT staging"), ' +
+        'exact phrase (quoted: \'"deploy config"\'), ' +
+        'prefix wildcard ("deploy*" matches deploy, deploying, deployment). ' +
+        'Column filter: "{title}: deploy" searches title only; "{body}: deploy" searches body only. ' +
+        'Results are ranked by relevance (BM25) when no explicit sort is given.'
+      ),
+      linked: z.record(z.string(), z.unknown()).optional().describe(
+        'Filter by structural wikilink relationship. Shape: { id: "NOTE_ID", direction: "to"|"from"|"any" }. ' +
+        '"to": results must link TO the given note (they have [[NOTE_ID]] in their frontmatter or body). ' +
+        '"from": results must be linked FROM the given note (NOTE_ID links to them). ' +
+        '"any": either direction. ' +
+        'Example: { id: "20260115000100", direction: "from" } returns all notes that 20260115000100 links to.'
+      ),
       include: z.record(z.string(), z.unknown()).optional().describe(
         'Traversal: co-fetch related notes for each result. ' +
         'Keys become result properties under _included. ' +
         'Each spec: { linked: { direction: "to"|"from"|"any" }, where?: {...} }. ' +
         'Example: { open_tasks: { linked: { direction: "from" }, where: { type: "task", status: { ne: "done" } } } }'
       ),
-      result_format: z.union([z.string(), z.array(z.string())]).optional().describe('"default" (note cache fields), "full" (include body), "count", or array of field names'),
-      sort: z.record(z.string(), z.unknown()).optional().describe('{ field: string, order: "asc"|"desc" }'),
+      result_format: z.union([z.string(), z.array(z.string())]).optional().describe(
+        'Shape of each result. ' +
+        '"default": standard noteCache fields (id, type, title, created, modified, status, gtd, etc). ' +
+        '"full": default fields plus note body text. ' +
+        '"count": returns { count: N } only — no note data. ' +
+        'Array of field names: return only those fields, e.g. ["id", "title", "due", "status"]. ' +
+        'Prefer the array form when you only need specific fields — keeps response small.'
+      ),
+      sort: z.record(z.string(), z.unknown()).optional().describe(
+        'Sort order. Shape: { field: "FIELD_NAME", order: "asc"|"desc" }. ' +
+        'Example: { field: "due", order: "asc" }. ' +
+        'When search is used and sort is omitted, results are ranked by FTS relevance. ' +
+        'Otherwise defaults to modified descending.'
+      ),
       limit: z.number().optional().describe('Max results (default 25)'),
       include_superseded: z.boolean().optional().describe('Include superseded notes in results (default false). Use when querying history or a specific superseded note.'),
     },

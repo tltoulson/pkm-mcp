@@ -21,7 +21,7 @@ const { validateType } = require('../utils/sentinel');
 async function captureImpl(args, ctx) {
   const {
     content = '',
-    suggested_type = 'note',
+    type = 'note',
     title: titleArg,
     metadata = {},
     related_note_ids = [],
@@ -30,7 +30,7 @@ async function captureImpl(args, ctx) {
   const { db, noteCache, vaultPath } = ctx;
 
   // Reject unknown sentinel types (e.g. $typo)
-  validateType(suggested_type);
+  validateType(type);
 
   // Determine title
   let title = titleArg;
@@ -48,7 +48,7 @@ async function captureImpl(args, ctx) {
 
   // Build frontmatter
   const frontmatterData = {
-    type: suggested_type,
+    type,
     title,
     created: now,
     modified: now,
@@ -73,11 +73,11 @@ async function captureImpl(args, ctx) {
   writeNote(filepath, frontmatterData, content);
 
   // Update db
-  const { type, title: t, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
+  const { type: _type, title: t, created, modified, superseded_by, supersedes, aliases, ...rest } = frontmatterData;
   const dbMetadata = { ...rest, aliases: aliases || undefined, _body: content };
 
   db.upsertNote(id, {
-    type: suggested_type,
+    type,
     title,
     created: now,
     modified: now,
@@ -91,7 +91,7 @@ async function captureImpl(args, ctx) {
 
   // Update noteCache
   addToCache(noteCache, id, {
-    type: suggested_type,
+    type,
     title,
     created: now,
     modified: now,
@@ -119,7 +119,7 @@ function register(mcpServer, ctx) {
     'Capture a new note, task, project, meeting, decision, or other item in the PKM vault',
     {
       content: z.string().optional().describe('Body content of the note (markdown)'),
-      suggested_type: z.string().optional().describe('Type of note to create. Regular types: task, project, note, journal, person, meeting, decision, reference, index. Sentinel types (reserved): $system. Machine-generated sentinel types (watcher-only, never capture manually): $attachment. Unknown $-prefixed types are rejected.'),
+      type: z.string().optional().describe('Type of note to create. Regular types: task, project, note, journal, person, meeting, decision, reference, index. Sentinel types (reserved): $system. Machine-generated sentinel types (watcher-only, never capture manually): $attachment. Unknown $-prefixed types are rejected.'),
       title: z.string().optional().describe('Title of the note (derived from content if omitted)'),
       metadata: z.record(z.string(), z.unknown()).optional().describe('Additional frontmatter fields'),
       related_note_ids: z.array(z.string()).optional().describe('IDs of related notes to link'),

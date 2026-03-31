@@ -241,7 +241,7 @@ Tool call arrives
 
 | Tool | Input | Effect |
 |------|-------|--------|
-| `capture` | content, suggested_type, title?, metadata?, related_note_ids? | File write + SQLite + noteCache |
+| `capture` | content, type, title?, metadata?, related_note_ids? | File write + SQLite + noteCache |
 | `update_note` | id, content?, title?, metadata? | Atomic file patch + SQLite + noteCache |
 | `delete_note` | id, confirm_id | File delete + SQLite + noteCache |
 

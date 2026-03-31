@@ -38,6 +38,10 @@ async function updateImpl(args, ctx) {
   }
   if (metadata && typeof metadata === 'object') {
     Object.assign(data, resolveNow(metadata));
+    // null means "remove this field"
+    for (const key of Object.keys(metadata)) {
+      if (metadata[key] === null) delete data[key];
+    }
   }
 
   // Always stamp modified

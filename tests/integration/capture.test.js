@@ -20,7 +20,7 @@ afterEach(() => {
 describe('captureImpl', () => {
   it('created_note_id is a 14-digit timestamp string', async () => {
     const result = await captureImpl(
-      { content: 'Do the thing', suggested_type: 'task', title: 'Do the thing' },
+      { content: 'Do the thing', type: 'task', title: 'Do the thing' },
       ctx
     );
     expect(result.created_note_id).toMatch(/^\d{14}$/);
@@ -28,7 +28,7 @@ describe('captureImpl', () => {
 
   it('file is created at vault root (flat, no subdir)', async () => {
     const result = await captureImpl(
-      { content: 'Do the thing', suggested_type: 'task', title: 'Do the thing' },
+      { content: 'Do the thing', type: 'task', title: 'Do the thing' },
       ctx
     );
     const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
@@ -37,9 +37,9 @@ describe('captureImpl', () => {
     expect(result.created_note_id).not.toContain('/');
   });
 
-  it('type field in noteCache matches suggested_type', async () => {
+  it('type field in noteCache matches type param', async () => {
     const result = await captureImpl(
-      { content: 'Body', suggested_type: 'task', title: 'Task Note' },
+      { content: 'Body', type: 'task', title: 'Task Note' },
       ctx
     );
     const entry = ctx.noteCache[result.created_note_id];
@@ -49,7 +49,7 @@ describe('captureImpl', () => {
 
   it('sets correct frontmatter fields: type, title, created, modified', async () => {
     const result = await captureImpl(
-      { content: 'Body', suggested_type: 'task', title: 'My Captured Task' },
+      { content: 'Body', type: 'task', title: 'My Captured Task' },
       ctx
     );
     const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
@@ -63,7 +63,7 @@ describe('captureImpl', () => {
 
   it('noteCache is updated after capture', async () => {
     const result = await captureImpl(
-      { content: 'Body', suggested_type: 'note', title: 'Manifest Test Note' },
+      { content: 'Body', type: 'note', title: 'Manifest Test Note' },
       ctx
     );
     expect(ctx.noteCache[result.created_note_id]).toBeDefined();
@@ -72,7 +72,7 @@ describe('captureImpl', () => {
 
   it('returns created_note_id and suggested_links', async () => {
     const result = await captureImpl(
-      { content: 'Body', suggested_type: 'note', title: 'Result Shape Test' },
+      { content: 'Body', type: 'note', title: 'Result Shape Test' },
       ctx
     );
     expect(result.created_note_id).toBeDefined();
@@ -84,7 +84,7 @@ describe('captureImpl', () => {
     const result = await captureImpl(
       {
         content: 'Body',
-        suggested_type: 'task',
+        type: 'task',
         title: 'Related Task',
         related_note_ids: [relatedId],
       },
@@ -102,7 +102,7 @@ describe('captureImpl', () => {
     const result = await captureImpl(
       {
         content: 'Body',
-        suggested_type: 'task',
+        type: 'task',
         title: 'Link Test',
         related_note_ids: [relatedId],
       },
@@ -118,7 +118,7 @@ describe('captureImpl', () => {
     const result = await captureImpl(
       {
         content: 'Body',
-        suggested_type: 'note',
+        type: 'note',
         title: 'Override Test',
         suggested_folder: 'references',
       },
@@ -130,7 +130,7 @@ describe('captureImpl', () => {
 
   it('derives title from first line of content when title not provided', async () => {
     const result = await captureImpl(
-      { content: '# My Heading Title\n\nBody text', suggested_type: 'note' },
+      { content: '# My Heading Title\n\nBody text', type: 'note' },
       ctx
     );
     const filepath = path.join(ctx.vaultPath, 'notes', result.created_note_id + '.md');
@@ -140,7 +140,7 @@ describe('captureImpl', () => {
 
   it('project type is stored correctly in noteCache', async () => {
     const result = await captureImpl(
-      { content: '', suggested_type: 'project', title: 'New Project' },
+      { content: '', type: 'project', title: 'New Project' },
       ctx
     );
     expect(ctx.noteCache[result.created_note_id].type).toBe('project');
@@ -148,7 +148,7 @@ describe('captureImpl', () => {
 
   it('meeting type is stored correctly in noteCache', async () => {
     const result = await captureImpl(
-      { content: '', suggested_type: 'meeting', title: 'New Meeting' },
+      { content: '', type: 'meeting', title: 'New Meeting' },
       ctx
     );
     expect(ctx.noteCache[result.created_note_id].type).toBe('meeting');

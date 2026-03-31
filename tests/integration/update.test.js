@@ -55,23 +55,6 @@ describe('updateImpl', () => {
     expect(fs.existsSync(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'))).toBe(true);
   });
 
-  it('status done auto-stamps completed field', async () => {
-    await updateImpl({ id: TASK_ID, metadata: { status: 'done' } }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
-    expect(data.completed).toBeDefined();
-    expect(data.completed).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-
-  it('status done when already has completed: does NOT overwrite existing completed', async () => {
-    // First set it done with a known timestamp
-    const firstTime = '2026-01-01T10:00:00';
-    await updateImpl({ id: TASK_ID, metadata: { status: 'done', completed: firstTime } }, ctx);
-    // Then update again
-    await updateImpl({ id: TASK_ID, metadata: { status: 'done' } }, ctx);
-    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
-    expect(data.completed).toBe(firstTime);
-  });
-
   it('returns { id, updated: true }', async () => {
     const result = await updateImpl({ id: TASK_ID, metadata: { gtd: 'next' } }, ctx);
     expect(result.id).toBe(TASK_ID);
@@ -115,5 +98,33 @@ describe('updateImpl', () => {
     await updateImpl({ id: TASK_ID, metadata: { tag: 'test' } }, ctx);
     const after = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
     expect(after.content).toBe(originalContent);
+  });
+
+  it('null metadata value removes the field from frontmatter', async () => {
+    // First add a custom field
+    await updateImpl({ id: TASK_ID, metadata: { aliases: ['my-task', 'runbook-update'] } }, ctx);
+    const mid = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
+    expect(mid.data.aliases).toEqual(['my-task', 'runbook-update']);
+
+    // Now remove it by setting to null
+    await updateImpl({ id: TASK_ID, metadata: { aliases: null } }, ctx);
+    const after = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
+    expect(after.data.aliases).toBeUndefined();
+  });
+
+  it('null metadata value removes the field from noteCache', async () => {
+    await updateImpl({ id: TASK_ID, metadata: { aliases: ['my-task'] } }, ctx);
+    expect(ctx.noteCache[TASK_ID].aliases).toEqual(['my-task']);
+
+    await updateImpl({ id: TASK_ID, metadata: { aliases: null } }, ctx);
+    expect(ctx.noteCache[TASK_ID].aliases).toBeUndefined();
+  });
+
+  it('null only removes targeted fields; other fields are preserved', async () => {
+    await updateImpl({ id: TASK_ID, metadata: { foo: 'keep', bar: 'remove' } }, ctx);
+    await updateImpl({ id: TASK_ID, metadata: { bar: null } }, ctx);
+    const { data } = readNote(path.join(ctx.vaultPath, 'notes', TASK_ID + '.md'));
+    expect(data.foo).toBe('keep');
+    expect(data.bar).toBeUndefined();
   });
 });

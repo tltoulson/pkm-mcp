@@ -91,7 +91,7 @@ When the type of an incoming capture is unclear:
 1. Run the Type Inventory report to survey available types
 2. Match against \`when_to_use\` and \`when_not_to_use\` on candidate types
 3. If no type fits cleanly, capture under the closest type and set
-   \`suggested_type\` to the proposed type name
+   \`subtype\` to the proposed type name
 4. Never invent a new type silently — see Create a New Type process
 
 ## Rules
@@ -111,7 +111,7 @@ When the type of an incoming capture is unclear:
 
 ### Create a New Type
 
-**Trigger:** User suggests a new note type, or accumulated \`suggested_type\`
+**Trigger:** User suggests a new note type, or accumulated \`subtype\`
 usage on multiple notes signals a pattern worth formalizing.
 
 **Description:** Guides Claude and user through designing a complete,
@@ -150,8 +150,8 @@ is a deliberate system design decision — never rushed.
 7. On explicit user confirmation, capture the type note with \`type: $system\`,
    \`subtype: type\`, and \`type_id\` set.
 8. Update the user's INSTRUCTIONS type registry to reference the new type.
-9. Update all notes carrying \`suggested_type: <type_id>\` — set \`type\` to
-   the new type_id value.
+9. Update all notes carrying \`subtype: <type_id>\` — set \`type\` to
+   the new type_id value and clear \`subtype\`.
 
 **Validation:**
 - \`title\`, \`type_id\`, \`description\`, \`when_to_use\`, and at least one field
@@ -297,9 +297,9 @@ values are sufficient.
 
 ---
 
-### Suggested Type Accumulation
+### Subtype Accumulation
 
-**Description:** Surfaces all suggested_type values currently in the vault,
+**Description:** Surfaces all subtype values currently in the vault,
 grouped by value with counts and representative examples. Shows whether any
 informal patterns have accumulated enough signal to warrant formalizing into
 a new type.
@@ -310,13 +310,13 @@ Create a New Type process when the trigger is pattern-based rather
 than an explicit user request.
 
 **Query:**
-- where: { suggested_type: { ne: null } }
-- result_format: ["id", "title", "type", "suggested_type", "created"]
-- sort: suggested_type asc
+- where: { subtype: { ne: null } }
+- result_format: ["id", "title", "type", "subtype", "created"]
+- sort: subtype asc
 
 **Output Template:**
-Group results by suggested_type value. For each group show:
-- The suggested_type value and total count of notes carrying it
+Group results by subtype value. For each group show:
+- The subtype value and total count of notes carrying it
 - Titles of up to three representative notes as examples
 - Date range of captures (earliest to latest created) to show how long
   the pattern has been forming
@@ -329,7 +329,7 @@ Close with: "Want to formalize any of these into a new type?" — if yes,
 follow the Create a New Type process.
 
 **Rules:**
-- Always group by suggested_type value — never present as a flat list |
+- Always group by subtype value — never present as a flat list |
   severity: hard | rationale: ungrouped results obscure the pattern signal
 - Flag patterns meeting the threshold but do not automatically initiate
   Create a New Type — user must opt in | severity: hard | rationale:
@@ -379,7 +379,7 @@ user-defined type, use \`note\` — never \`universal\`.
 | \`related\` | list | no | no | — | — | list_item_type: relationship, target_types: any. Peer references — cross-references that are not parent/child relationships. | See field rules below: project vs related decision guide. |
 | \`supersedes\` | relationship | no | no | — | — | target_types: any. Set on the NEW note when it replaces a prior note. Points back to the old note. | Only set when a new understanding replaces an earlier one and both are worth preserving. Not for simple edits — use update instead. |
 | \`superseded_by\` | relationship | no | no | — | — | target_types: any. Set on the OLD note when a newer version exists. Points forward to the replacement. | severity: enforced — notes with this field set are hidden from all queries and the manifest. Retrievable only via explicit ID. |
-| \`suggested_type\` | string | no | no | — | — | Proposed future type if this note doesn't cleanly fit an existing type. Accumulation of this value is signal to formalize a new type. | Never silently invent a new type — capture under closest type and set suggested_type. See global process: Create a New Type. |
+| \`subtype\` | string | no | no | — | — | Sub-classification within a type, or a proposed future type if this note doesn't cleanly fit an existing type. Accumulation of a subtype value across notes is signal to formalize a new type. | Never silently invent a new type — capture under closest type and set subtype. See global process: Create a New Type. |
 | \`imported\` | boolean | no | no | — | — | true for backloaded historical notes. Omit for current captures. | — |
 
 ### Field Rules
@@ -416,7 +416,7 @@ project completion (update status).
 | Claude never manually sets created, modified, or completed — the server stamps these automatically. | enforced | Manual stamping would create inconsistency. Server is the authority on these values. |
 | Never add tags frontmatter to any note. | hard | Tags create maintenance burden without adding retrieval capability that FTS + metadata + note links don't already provide. |
 | Never create a duplicate person, index, or other singleton note — update the existing one unless a new dated entry is the correct editorial choice. | hard | Duplicates fragment retrieval and create reconciliation burden. |
-| Never invent new note types without consulting the user. Capture under closest type with suggested_type and follow the Create a New Type process. | hard | Type proliferation without design degrades system consistency. |
+| Never invent new note types without consulting the user. Capture under closest type with subtype and follow the Create a New Type process. | hard | Type proliferation without design degrades system consistency. |
 | One task per bug or feature request. Never batch multiple discrete issues into a single task note. | hard | Batching prevents independent lifecycle tracking per issue. |
 | Never add a frontmatter field to a note that is not defined in the universal type or the note's specific type note without explicit user confirmation. | hard | Ad hoc fields fragment the schema and break query consistency. The user must validate any field addition not covered by an existing type definition. |
 | Never ask for confirmation on straightforward captures — capture and report back. | guidance | Friction kills the capture habit. Reserve confirmation for ambiguous or high-consequence operations. |
@@ -478,9 +478,9 @@ values are sufficient.
 
 ---
 
-### Suggested Type Accumulation
+### Subtype Accumulation
 
-**Description:** Surfaces all suggested_type values currently in the vault,
+**Description:** Surfaces all subtype values currently in the vault,
 grouped by value with counts and representative examples. Shows whether any
 informal patterns have accumulated enough signal to warrant formalizing into
 a new type.
@@ -491,13 +491,13 @@ Create a New Type process when the trigger is pattern-based rather
 than an explicit user request.
 
 **Query:**
-- where: { suggested_type: { ne: null } }
-- result_format: ["id", "title", "type", "suggested_type", "created"]
-- sort: suggested_type asc
+- where: { subtype: { ne: null } }
+- result_format: ["id", "title", "type", "subtype", "created"]
+- sort: subtype asc
 
 **Output Template:**
-Group results by suggested_type value. For each group show:
-- The suggested_type value and total count of notes carrying it
+Group results by subtype value. For each group show:
+- The subtype value and total count of notes carrying it
 - Titles of up to three representative notes as examples
 - Date range of captures (earliest to latest created) to show how long
   the pattern has been forming
@@ -510,7 +510,7 @@ Close with: "Want to formalize any of these into a new type?" — if yes,
 follow the Create a New Type process.
 
 **Rules:**
-- Always group by suggested_type value — never present as a flat list |
+- Always group by subtype value — never present as a flat list |
   severity: hard | rationale: ungrouped results obscure the pattern signal
 - Flag patterns meeting the threshold but do not automatically initiate
   Create a New Type — user must opt in | severity: hard | rationale:

@@ -40,7 +40,7 @@ describe('queryImpl — where equality', () => {
 
   it('dynamic key works after note with custom field is created', async () => {
     await captureImpl(
-      { content: '', suggested_type: 'task', title: 'Custom Field Task', metadata: { custom_priority: 'ultra' } },
+      { content: '', type: 'task', title: 'Custom Field Task', metadata: { custom_priority: 'ultra' } },
       ctx
     );
     const results = await queryImpl({ where: { custom_priority: 'ultra' } }, ctx);
@@ -152,7 +152,7 @@ describe('queryImpl — where date filters', () => {
   });
 
   it('"today" sentinel matches notes created today', async () => {
-    const todayNote = await captureImpl({ content: '', suggested_type: 'note', title: 'Today Note' }, ctx);
+    const todayNote = await captureImpl({ content: '', type: 'note', title: 'Today Note' }, ctx);
     const results = await queryImpl({ where: { created: 'today' } }, ctx);
     expect(results.map(r => r.id)).toContain(todayNote.created_note_id);
   });
