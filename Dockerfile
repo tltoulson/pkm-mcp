@@ -13,6 +13,12 @@ COPY src/ ./src/
 
 ENV NODE_ENV=production
 
+# Run as non-root so files created in bind-mounted volumes are owned by the
+# host user rather than root.  The node:22-slim base image ships a "node" user
+# (UID 1000) that is used as the default; docker-compose can override the
+# numeric UID/GID at runtime via PUID/PGID env vars and `user:`.
+USER node
+
 EXPOSE 8765
 
 # Graceful shutdown: handle both SIGINT and SIGTERM (Docker sends SIGTERM)

@@ -1,6 +1,7 @@
 services:
   pkm-mcp:
     build: .
+    user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       - "${MCP_PORT:-8765}:${MCP_PORT:-8765}"
     volumes:
