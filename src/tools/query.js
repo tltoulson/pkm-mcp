@@ -25,7 +25,7 @@ function matchesFilter(entryVal, val) {
 
     if ('in' in val)          return Array.isArray(val.in) && val.in.includes(entryVal);
     if ('not_in' in val)      return Array.isArray(val.not_in) && !val.not_in.includes(entryVal);
-    if ('ne' in val)          return entryVal !== val.ne;
+    if ('ne' in val)          return entryVal !== undefined && entryVal !== val.ne;
     if ('contains' in val)    return strLower.includes(String(val.contains).toLowerCase());
     if ('not_contains' in val)return !strLower.includes(String(val.not_contains).toLowerCase());
     if ('starts_with' in val) return strLower.startsWith(String(val.starts_with).toLowerCase());

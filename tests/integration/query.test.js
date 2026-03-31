@@ -64,6 +64,23 @@ describe('queryImpl — where ne', () => {
     const results = await queryImpl({ where: { type: 'task', gtd: { ne: 'inbox' } } }, ctx);
     results.forEach(r => expect(r.gtd).not.toBe('inbox'));
   });
+
+  it('{aliases: {ne: null}} excludes notes where aliases is absent', async () => {
+    // 20260317000200 = Jordan Lee, a person fixture with no aliases field
+    const results = await queryImpl({ where: { type: 'person', aliases: { ne: null } } }, ctx);
+    expect(results.length).toBeGreaterThan(0);
+    const ids = results.map(r => r.id);
+    expect(ids).not.toContain('20260317000200');
+    results.forEach(r => expect(r.aliases).not.toBeUndefined());
+    results.forEach(r => expect(r.aliases).not.toBeNull());
+  });
+
+  it('{aliases: null} equality does not match notes where aliases is absent', async () => {
+    // Absent field (undefined) should not match explicit null equality
+    const results = await queryImpl({ where: { type: 'person', aliases: null } }, ctx);
+    const ids = results.map(r => r.id);
+    expect(ids).not.toContain('20260317000200');
+  });
 });
 
 // ---------------------------------------------------------------------------
