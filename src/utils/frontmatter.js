@@ -61,7 +61,7 @@ function writeNote(filepath, data, content) {
 
   // Atomic write: write to tmp then rename
   const tmpPath = path.join(os.tmpdir(), `pkm-tmp-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
-  fs.writeFileSync(tmpPath, serialized, 'utf8');
+  fs.writeFileSync(tmpPath, serialized, { encoding: 'utf8', mode: 0o644 });
   try {
     fs.renameSync(tmpPath, filepath);
   } catch (err) {
