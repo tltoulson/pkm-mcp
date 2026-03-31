@@ -76,10 +76,27 @@ function writeNote(filepath, data, content) {
 }
 
 /**
+ * Resolve the $now sentinel in a metadata object.
+ * Any field whose value is exactly the string '$now' is replaced with the
+ * current timestamp. Only top-level string values are checked; nested objects
+ * and arrays are left untouched.
+ * @param {object} obj - frontmatter patches / metadata object
+ * @returns {object} - new object with $now values replaced
+ */
+function resolveNow(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const now = nowTimestamp();
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = v === '$now' ? now : v;
+  }
+  return out;
+}
+
+/**
  * Patch specific frontmatter keys in a note file.
  * Only modifies the specified keys — does not touch other fields.
  * Auto-stamps `modified` always.
- * Auto-stamps `completed` when status transitions to 'done' (if not already set).
  * @param {string} filepath
  * @param {object} patches - key/value pairs to update
  * @returns {{ data: object, content: string }}
@@ -92,11 +109,6 @@ function patchNote(filepath, patches) {
 
   // Auto-stamp modified
   data.modified = nowTimestamp();
-
-  // Auto-stamp completed when status becomes 'done'
-  if (patches.status === 'done' && !data.completed) {
-    data.completed = nowTimestamp();
-  }
 
   writeNote(filepath, data, content);
   return { data, content };
@@ -165,4 +177,5 @@ module.exports = {
   extractWikilinks,
   normalizeWikilink,
   nowTimestamp,
+  resolveNow,
 };

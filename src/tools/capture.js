@@ -6,7 +6,7 @@ const path = require('path');
 const { generateId, idToPath, NOTES_DIR } = require('../utils/timestamp');
 const { extractLinks } = require('../utils/links');
 const { addToCache } = require('../noteCache');
-const { nowTimestamp, writeNote } = require('../utils/frontmatter');
+const { nowTimestamp, writeNote, resolveNow } = require('../utils/frontmatter');
 const { validateType } = require('../utils/sentinel');
 
 /**
@@ -52,7 +52,7 @@ async function captureImpl(args, ctx) {
     title,
     created: now,
     modified: now,
-    ...metadata,
+    ...resolveNow(metadata),
   };
 
   // Add related links if provided

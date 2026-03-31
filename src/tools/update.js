@@ -2,7 +2,7 @@
 
 const { z } = require('zod');
 const fs = require('fs');
-const { readNote, writeNote, nowTimestamp } = require('../utils/frontmatter');
+const { readNote, writeNote, nowTimestamp, resolveNow } = require('../utils/frontmatter');
 const { extractLinks } = require('../utils/links');
 const { addToCache } = require('../noteCache');
 const { idToPath } = require('../utils/timestamp');
@@ -37,16 +37,7 @@ async function updateImpl(args, ctx) {
     data.title = title;
   }
   if (metadata && typeof metadata === 'object') {
-    Object.assign(data, metadata);
-  }
-
-  // Auto-stamp completed when status becomes 'done'
-  if (data.status === 'done' && !data.completed) {
-    data.completed = nowTimestamp();
-  }
-  // Also handle project status transitions
-  if (data.type === 'project' && (data.status === 'done' || data.status === 'cancelled') && !data.completed) {
-    data.completed = nowTimestamp();
+    Object.assign(data, resolveNow(metadata));
   }
 
   // Always stamp modified
